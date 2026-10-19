@@ -286,6 +286,4 @@ Actual legacy publishing requires `--write`, the optional dependencies and your 
 
 No accounts, deployments or billable cloud resources are provisioned automatically. Real account permissions, schema, connectivity and SDK/server compatibility must be checked when credentials arrive. The installed Hopsworks SDK 5.2.1 was imported and its API surface inspected; provider login and storage/network access remain unverified against live accounts.
 
-## Scope and event rules
 
-These are exploration prototypes for comparing concepts. The event's published rule against prebuilt submission repositories has not changed; confirm what you may reuse. The two-hour recommendations in the demo guide refer to deliberately smaller implementations, not reproducing this entire lab during the event.
