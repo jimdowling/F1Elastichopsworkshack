@@ -1,8 +1,8 @@
 # F1Elastichopsworkshack — PITLANE
 
-[Static GitHub Pages overview](./index.html) · [Workflow slide](./presentation/Elastic-Hopsworks-Workflow.pptx)
+[Live demo](https://fihackdemo.kiranreddy.nl) · [Static GitHub Pages overview](./index.html) · [Workflow slide](./presentation/Elastic-Hopsworks-Workflow.pptx)
 
-> GitHub Pages hosts a static project overview. The interactive dashboard needs the FastAPI backend and private server-side `.env`; provider credentials are not published here.
+> The public demo uses a temporary Cloudflare Tunnel to the FastAPI server on the demo Mac; it is available only while that host and tunnel are online. GitHub Pages itself is static. Provider credentials remain server-side and are not published.
 
 ---
 
