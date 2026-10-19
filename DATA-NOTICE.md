@@ -13,11 +13,11 @@ A third bundled data scope now exists under `data/replay/`: the **2024 Dutch GP 
 - Rank is an as-of timing-feed observation, then final classification after completion. XY separation is derived straight-line distance, not an official race interval. Lap/tyre labels use consecutive recorded lap starts to resolve small endpoint overlaps; raw durations remain unchanged.
 - XY is mapped into an illustrative 3D world; source Z is retained but elevation is flattened. Cars, road width, scenery and engine sound are not surveyed/manufacturer-authenticated physical models.
 
-See `docs/MULTI-CAR-REPLAY.md`. The original 1,444-sample telemetry schema export and four ML/replay feature groups remain scoped to the independent comparison laps; the new field replay has dedicated `/api/replay/*` endpoints. No private event/Elastic/Hopsworks account is implied or required by this public replay.
+See `docs/MULTI-CAR-REPLAY.md`. The original 1,444-sample telemetry schema export and four ML/replay feature groups remain scoped to the independent comparison laps; the new field replay has dedicated `/api/replay/*` endpoints. No private event/Hopsworks account is implied or required by this public replay.
 
 ## Configurable native connections in version 2.1
 
-No event/user account was accessed during this build. The delivered runtime can now query the configured native Elastic `f1-*` indices and consume selected-race pace features from verified Hopsworks batches after explicit configuration. These are optional, operator-protected paths; the default remains the bundled public archive.
+No event/user account was accessed during this build. The delivered runtime can now query the configured Hopsworks event tables (`f1_*` feature groups) and consume selected-race pace features from verified Hopsworks batches after explicit configuration. These are optional, operator-protected paths; the default remains the bundled public archive.
 
 Native Race/Qualifying results, laps, weather and bounded telemetry are distinct from labeled public supplements (venue/driver metadata, Sprint, timing details, speed traps, pit transit and control messages). Native lap timestamps are not invented: historical timing stays on its public reference. Native weather's absent absolute UTC date stays absent. The original four experiments are not silently retrained or relabeled. See `docs/CLOUD-SETUP.md` for exact scope, credentials, permissions and retention/security boundaries.
 
@@ -106,8 +106,8 @@ The source code and QA report distinguish measured channels, interpolated visual
 
 ## Infrastructure boundary
 
-The default application and original four lab pipelines use SQLite. Version 2.1 adds optional, explicit dashboard Elastic/Hopsworks modes: the app can consume native reads and verified remote pace-feature batches, not only publish data. Account validation has not happened during this build. Public supplements, private native values and the original experiments remain labeled separately. The legacy original-lab publisher does not automatically switch those experiments to cloud execution.
+The default application and original four lab pipelines use SQLite. Version 2.1 adds optional, explicit dashboard Hopsworks modes: the app can consume native reads and verified remote pace-feature batches, not only publish data. Account validation has not happened during this build. Public supplements, private native values and the original experiments remain labeled separately. The legacy original-lab publisher does not automatically switch those experiments to cloud execution.
 
 ## Use and attribution
 
-This is an independent exploratory demo, not an official Formula 1, team, driver, OpenF1, Elastic, or Hopsworks product. Public availability does not establish unrestricted rights to redistribute or commercially exploit a data feed. Review the source providers' current terms and applicable data/trademark rights before broader redistribution or commercial deployment. No ownership or new license over third-party race data is asserted here.
+This is an independent exploratory demo, not an official Formula 1, team, driver, OpenF1, or Hopsworks product. Public availability does not establish unrestricted rights to redistribute or commercially exploit a data feed. Review the source providers' current terms and applicable data/trademark rights before broader redistribution or commercial deployment. No ownership or new license over third-party race data is asserted here.

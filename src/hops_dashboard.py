@@ -1,7 +1,7 @@
-"""Native event-index reads, with explicitly labeled public supplements.
+"""Native Hopsworks event feature-group reads, with explicitly labeled public supplements.
 
 Event schema has no lap timestamps, pit-transit durations, control messages,
-Sprint results or Q1/Q2/Q3 times. Those are never silently claimed as Elastic.
+Sprint results or Q1/Q2/Q3 times. Those are never silently claimed as Hopsworks source data.
 """
 from collections import defaultdict
 from datetime import datetime,timezone
@@ -11,7 +11,7 @@ from .dashboard import DashboardEngine,DASH,ROOT,read,mean
 from .remote import FIELDS,canonical,digest
 from .settings import problem
 
-NATIVE_NOTE=('Elastic supplies Race/Qualifying results, laps and weather. Public supplements supply venue/driver metadata, Sprint points, classified elapsed times/completed-lap totals, qualifying segments, speed traps, pit-lane visits and race control. Historical timing and the four original labs remain separate public snapshots. No silent local fallback is used for failed native reads.')
+NATIVE_NOTE=('Hopsworks event feature groups supply Race/Qualifying results, laps and weather. Public supplements supply venue/driver metadata, Sprint points, classified elapsed times/completed-lap totals, qualifying segments, speed traps, pit-lane visits and race control. Historical timing and the four original labs remain separate public snapshots. No silent local fallback is used for failed native reads.')
 RESULT_FIELDS=FIELDS['results']
 
 def number(value,name,integer=False,minimum=None):
@@ -44,10 +44,10 @@ def scope(rows,filters):
     # Defense in depth: do not trust a proxy/fixture to have applied the requested filters.
     for r in rows:
         base_record(r)
-        if any(r.get(k)!=v for k,v in filters.items()):problem('scope_mismatch','Elastic returned records outside the requested scope; no mixed dataset was activated.')
+        if any(r.get(k)!=v for k,v in filters.items()):problem('scope_mismatch','Hopsworks returned records outside the requested scope; no mixed dataset was activated.')
     return rows
 
-class ElasticDashboard(DashboardEngine):
+class HopsDashboard(DashboardEngine):
     def __init__(self,reader,feature_reader=None,runtime_path=None):
         self.reader=reader;public=read(DASH/'catalog.json');self.public_catalog=public
         self.native_sessions=unique(scope(reader.read('sessions',{}),{}),lambda r:base_record(r))
@@ -55,7 +55,7 @@ class ElasticDashboard(DashboardEngine):
         session_keys={(r['season'],r['round_number']) for r in self.native_sessions if r['session_name']=='Race'}
         race_keys={(r['season'],r['round_number']) for r in self.native_results if r['session_name']=='Race'}
         keys=session_keys&race_keys
-        if not keys:problem('empty_source','No matching Race session/result records were found in the configured event indices.')
+        if not keys:problem('empty_source','No matching Race session/result records were found in the configured Hopsworks event feature groups.')
         drivers=copy.deepcopy(public['drivers']);teams=copy.deepcopy(public['teams']);by_code={d['code']:d for d in drivers};team_ids={t['team_id'] for t in teams}
         refs={(r['season'],r['round_number'],r['session_name'],r['driver_code']):r for r in public['results']}
         normalized=[]
@@ -72,7 +72,7 @@ class ElasticDashboard(DashboardEngine):
             if team_id not in team_ids:teams.append({'team_id':team_id,'name':team_name,'nationality':None});team_ids.add(team_id)
             row={k:ref.get(k) for k in ['laps','classified_time_ms','time_label','fastest_lap_rank','fastest_lap_number','fastest_lap_avg_kph','q1_ms','q2_ms','q3_ms']}
             row.update({k:r.get(k) for k in RESULT_FIELDS})
-            row.update({'id':f'{y}-{n}-{kind}-{driver["driver_id"]}','driver_id':driver['driver_id'],'team_id':team_id,'full_name':r.get('full_name') or driver['name'],'team_name':team_name,'position_text':str(r.get('position') or '—'),'source':'Elastic event results + labeled public timing/metadata supplements','supplemental_fields':['laps','classified_time_ms','time_label','fastest_lap_rank','fastest_lap_number','fastest_lap_avg_kph','q1_ms','q2_ms','q3_ms']})
+            row.update({'id':f'{y}-{n}-{kind}-{driver["driver_id"]}','driver_id':driver['driver_id'],'team_id':team_id,'full_name':r.get('full_name') or driver['name'],'team_name':team_name,'position_text':str(r.get('position') or '—'),'source':'Hopsworks event results + labeled public timing/metadata supplements','supplemental_fields':['laps','classified_time_ms','time_label','fastest_lap_rank','fastest_lap_number','fastest_lap_avg_kph','q1_ms','q2_ms','q3_ms']})
             for name in ['driver_number','position','grid_position','fastest_lap_ms']:
                 value=row.get(name)
                 if name=='driver_number' and isinstance(value,str) and re.fullmatch(r'\d+',value):value=int(value)
@@ -82,7 +82,7 @@ class ElasticDashboard(DashboardEngine):
             if row['points'] is None:problem('schema_mismatch','Native result points must be supplied (zero is valid).')
             row['status']=row.get('status') or 'Unknown'
             normalized.append(row)
-        # Event indices advertise Race/Qualifying only. Sprint is explicit public supplemental data.
+        # Event feature groups advertise Race/Qualifying only. Sprint is explicit public supplemental data.
         normalized.extend({**r,'source':'Jolpica public Sprint supplement'} for r in public['results'] if r['session_name']=='Sprint' and (r['season'],r['round_number']) in keys)
         events=[];sessions=[];event_refs={(e['season'],e['round_number']):e for e in public['events']}
         for key in sorted(keys):
@@ -91,21 +91,21 @@ class ElasticDashboard(DashboardEngine):
             date=native.get('session_date')
             try:datetime.fromisoformat(date.replace('Z','+00:00'))
             except (ValueError,TypeError,AttributeError):problem('schema_mismatch','Native session_date must be an ISO date/time.')
-            event['date']=date[:10];event['source']='Elastic session metadata + public venue metadata';events.append(event)
+            event['date']=date[:10];event['source']='Hopsworks session metadata + public venue metadata';events.append(event)
         for r in self.native_sessions:
-            if (r['season'],r['round_number']) in keys:sessions.append({**r,'id':f"{r['season']}-{r['round_number']}-{r['session_name']}",'source':'Elastic event sessions'})
+            if (r['season'],r['round_number']) in keys:sessions.append({**r,'id':f"{r['season']}-{r['round_number']}-{r['session_name']}",'source':'Hopsworks event sessions'})
         catalog={'seasons':sorted({k[0] for k in keys}),'events':events,'drivers':drivers,'teams':teams,'sessions':sessions,'results':normalized,'official_standings':[],
             'pit_stops':[p for p in public['pit_stops'] if (p['season'],p['round_number']) in keys]}
         # A separate disposable DB avoids overwriting the public runtime cache.
-        super().__init__(catalog=catalog,feature_reader=feature_reader,runtime_path=runtime_path or ROOT/'.cache/elastic-dashboard.sqlite')
-        self.data_source='elastic';self.raw_cache={};self.loaded_at=datetime.now(timezone.utc).isoformat()
+        super().__init__(catalog=catalog,feature_reader=feature_reader,runtime_path=runtime_path or ROOT/'.cache/hops-dashboard.sqlite')
+        self.data_source='hopsworks';self.raw_cache={};self.loaded_at=datetime.now(timezone.utc).isoformat()
     def pace_source_id(self,season,round_number):
-        return digest([self.reader.settings.elastic_url,self.reader.settings.indexes,super().pace_source_id(season,round_number)])
+        s=self.reader.settings;return digest([s.hops_host,s.hops_project,s.sources,s.source_version,super().pace_source_id(season,round_number)])
     def catalog_view(self):
-        d=super().catalog_view();d.update({'backend':'Elastic event indices + explicit public supplements','data_source':'elastic','cloud_connected':True,'scope_note':NATIVE_NOTE})
+        d=super().catalog_view();d.update({'backend':'Hopsworks event feature groups + explicit public supplements','data_source':'hopsworks','cloud_connected':True,'scope_note':NATIVE_NOTE})
         d['counts'].update({'laps':None,'native_results':len(self.native_results)});return d
     def season_view(self,season,through):
-        d=copy.deepcopy(super().season_view(season,through));d['methodology']='Points over the available Elastic Race results + public Sprint supplements. Missing rounds are not filled; final cloud standings are not forced to public totals.';d['source_note']=NATIVE_NOTE;return d
+        d=copy.deepcopy(super().season_view(season,through));d['methodology']='Points over the available Hopsworks Race results + public Sprint supplements. Missing rounds are not filled; final cloud standings are not forced to public totals.';d['source_note']=NATIVE_NOTE;return d
     def native(self,kind,season,round_number,session='Race'):
         self.event(season,round_number);filters={'season':season,'round_number':round_number,'session_name':session}
         rows=scope(self.reader.read(kind,filters),filters)
@@ -136,7 +136,7 @@ class ElasticDashboard(DashboardEngine):
             code=r['driver_code'];result=results.get(code)
             if not result:problem('schema_mismatch','A native lap driver has no corresponding Race result in the selected event.')
             ref=ref_laps.get((code,r['lap_number']),{});l={**r,'id':f'{season}-{round_number}-R-{code}-{r["lap_number"]}','team_id':result['team_id'],'team_name':r.get('team_name') or result['team_name'],'driver_number':result['driver_number'],
-                'compound':r.get('compound') or 'UNKNOWN','source':'Elastic event laps; public speed-trap supplement only','date_start':None,'lap_start_s':None,'lap_end_s':None,
+                'compound':r.get('compound') or 'UNKNOWN','source':'Hopsworks event laps; public speed-trap supplement only','date_start':None,'lap_start_s':None,'lap_end_s':None,
                 'speed_trap_kph':ref.get('speed_trap_kph'),'i1_speed_kph':ref.get('i1_speed_kph'),'i2_speed_kph':ref.get('i2_speed_kph')}
             # Preserve null native flags; clean filtering treats unknown as ineligible.
             for f in FIELDS['laps']:l.setdefault(f,None)
@@ -154,13 +154,13 @@ class ElasticDashboard(DashboardEngine):
             'race_start_epoch':None,'clock_origin_epoch':None,'coverage_note':NATIVE_NOTE}
         self.raw_cache[key]=(time.monotonic(),raw);return copy.deepcopy(raw)
     def _weather_rows(self,rows):
-        return [{**{k:r.get(k) for k in FIELDS['weather']},'id':digest(r),'source':'Elastic event weather','date':None} for r in sorted(rows,key=lambda r:r.get('session_time_s') if r.get('session_time_s') is not None else -float('inf'))]
+        return [{**{k:r.get(k) for k in FIELDS['weather']},'id':digest(r),'source':'Hopsworks event weather','date':None} for r in sorted(rows,key=lambda r:r.get('session_time_s') if r.get('session_time_s') is not None else -float('inf'))]
     def weather_view(self,season,round_number,session='Race'):
         rows=self._weather_rows(self.native('weather',season,round_number,session))
-        return {'season':season,'round_number':round_number,'session_name':session,'rows':rows,'summary':{k:mean([r[k] for r in rows if isinstance(r.get(k),(int,float))]) for k in ['air_temperature','track_temperature','humidity','pressure','wind_speed']},'rain_samples':sum(r.get('rainfall') is True for r in rows),'source':'Elastic event weather; native session-relative time'}
+        return {'season':season,'round_number':round_number,'session_name':session,'rows':rows,'summary':{k:mean([r[k] for r in rows if isinstance(r.get(k),(int,float))]) for k in ['air_temperature','track_temperature','humidity','pressure','wind_speed']},'rain_samples':sum(r.get('rainfall') is True for r in rows),'source':'Hopsworks event weather; native session-relative time'}
     def race_view(self,*args):
         d=super().race_view(*args);d['source_note']=NATIVE_NOTE;d['timing_note']='Use the separate public historical-timing endpoint: native event laps do not supply synchronized lap timestamps.';return d
     def coverage_view(self):
         # No implicit 46-race cloud download just to render coverage.
-        return {'data_source':'elastic','source_note':NATIVE_NOTE,'loaded_at':self.loaded_at,'native_sessions':len(self.native_sessions),'native_results':len(self.native_results),'events':len(self.events),
-            'verified_index_counts':self.reader.counts,'cached_race_slices':len(self.raw_cache),'last_native_read':self.reader.last_read,'feature_backend':self.feature_source,'models_scope':'Original four experiments remain the frozen public Dutch GP snapshot. Dashboard race-pace features use the selected provider.'}
+        return {'data_source':'hopsworks','source_note':NATIVE_NOTE,'loaded_at':self.loaded_at,'native_sessions':len(self.native_sessions),'native_results':len(self.native_results),'events':len(self.events),
+            'verified_group_counts':self.reader.counts,'cached_race_slices':len(self.raw_cache),'last_native_read':self.reader.last_read,'feature_backend':self.feature_source,'models_scope':'Original four experiments remain the frozen public Dutch GP snapshot. Dashboard race-pace features use the selected provider.'}

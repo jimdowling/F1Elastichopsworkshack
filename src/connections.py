@@ -13,28 +13,31 @@ from fastapi import APIRouter,Request,HTTPException,Query
 from fastapi.responses import FileResponse,JSONResponse
 from pydantic import BaseModel,Field
 from .settings import Settings,ConnectionProblem,problem,ROOT
-from .remote import ElasticReader,HopsFeatures,FIELDS
+from .remote import HopsConnection,HopsSource,HopsFeatures
 
 router=APIRouter(prefix='/api/connections',tags=['Server-side connections'])
 def now():return datetime.now(timezone.utc).isoformat()
 
 class Runtime:
-    def __init__(self,settings=None,elastic_factory=ElasticReader,hops_factory=HopsFeatures):
-        self.lock=RLock();self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='pitlane-connection');self.elastic_factory=elastic_factory;self.hops_factory=hops_factory
+    def __init__(self,settings=None,client=None):
+        # client: optional Hopsworks SDK stand-in (tests); production imports the hopsworks module lazily.
+        self.lock=RLock();self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='pitlane-connection');self.client=client
         self.settings_error=None
         try:self.settings=settings or Settings.load()
         except ConnectionProblem as e:self.settings=Settings();self.settings_error=e
         self.modes={'data':self.settings.data_mode,'features':self.settings.feature_mode};self.generation=uuid.uuid4().hex[:12]
-        self.elastic=None;self.hops=None;self.engines={};self.checks={};self.job=None;self.last_feature_plan=None
+        self.connection=None;self.source=None;self.hops=None;self.engines={};self.checks={};self.job=None;self.last_feature_plan=None
     @property
     def private(self):return self.settings_error is not None or self.modes['data']!='local' or self.modes['features']!='local'
+    def hopsworks(self):
+        if self.settings_error:raise self.settings_error
+        if self.connection is None:self.connection=HopsConnection(self.settings,self.client)
+        return self.connection
     def reader(self):
-        if self.settings_error:raise self.settings_error
-        if self.elastic is None:self.elastic=self.elastic_factory(self.settings)
-        return self.elastic
+        if self.source is None:self.source=HopsSource(self.settings,self.hopsworks())
+        return self.source
     def store(self):
-        if self.settings_error:raise self.settings_error
-        if self.hops is None:self.hops=self.hops_factory(self.settings)
+        if self.hops is None:self.hops=HopsFeatures(self.settings,self.hopsworks())
         return self.hops
     def engine(self,data=None,features=None):
         if self.settings_error:raise self.settings_error
@@ -47,21 +50,21 @@ class Runtime:
             from .dashboard import DashboardEngine
             path=ROOT/'.cache'/f'dashboard-{self.generation}-{data}-{features}.sqlite'
             reader=self.store().read if features=='hopsworks' else None
-            if data=='elastic':
-                from .elastic_dashboard import ElasticDashboard
-                db=ElasticDashboard(self.reader(),feature_reader=reader,runtime_path=path)
+            if data=='hopsworks':
+                from .hops_dashboard import HopsDashboard
+                db=HopsDashboard(self.reader(),feature_reader=reader,runtime_path=path)
             else:db=DashboardEngine(feature_reader=reader,runtime_path=path)
             db.feature_source='Hopsworks' if features=='hopsworks' else 'SQLite';self.engines[key]=db;return db
     def status(self):
-        elastic_read=self.elastic.last_read if self.elastic else None;hops_read=self.hops.last_read if self.hops else None
-        active_verified=(self.modes['data']=='elastic' and bool(elastic_read)) or (self.modes['features']=='hopsworks' and bool(hops_read))
+        source_read=self.source.last_read if self.source else None;hops_read=self.hops.last_read if self.hops else None
+        active_verified=(self.modes['data']=='hopsworks' and bool(source_read)) or (self.modes['features']=='hopsworks' and bool(hops_read))
         return {**self.settings.public(),'modes':dict(self.modes),'configuration_error':self.settings_error.public() if self.settings_error else None,'checks':dict(self.checks),'job':dict(self.job) if self.job else None,
-            'cloud_connected':bool(active_verified),'last_elastic_read':elastic_read,'last_hopsworks_read':hops_read,'feature_plan':self.last_feature_plan,
+            'cloud_connected':bool(active_verified),'last_source_read':source_read,'last_hopsworks_read':hops_read,'feature_plan':self.last_feature_plan,
             'scope':'Cloud modes apply to the historical dashboard and its pace features. Historical timing and all four original Dutch-GP labs remain the separately labeled public snapshot.',
             'persistence':'Mode switches affect this server process. Put the desired modes in .env for restart persistence. Credentials are never edited or returned by this API.'}
     def test(self,provider):
         try:
-            result=self.reader().inspect() if provider=='elastic' else self.store().inspect()
+            result=self.reader().inspect() if provider=='source' else self.store().inspect()
             self.checks[provider]={**result,'tested_at':now()};return self.checks[provider]
         except ConnectionProblem as e:
             self.checks[provider]={'ok':False,'tested_at':now(),'error':e.public()};raise
@@ -79,12 +82,12 @@ class Runtime:
         source,rows=self.feature_inputs(season,round_number,clean,cutoff)
         return self.store().publish(source,rows)
     def switch(self,data,features,season,round_number,clean,cutoff):
-        if data not in {'local','elastic'} or features not in {'local','hopsworks'}:problem('invalid_mode','Unsupported backend mode.',422)
+        if data not in {'local','hopsworks'} or features not in {'local','hopsworks'}:problem('invalid_mode','Unsupported backend mode.',422)
         if data!='local' or features!='local':
             if not self.settings.admin_ready:problem('admin_required','Configure a PITLANE_ADMIN_TOKEN of at least 24 characters before enabling cloud mode.',403)
         # Construct and verify the candidate first. Failures leave the old modes unchanged.
         candidate=self.engine(data,features)
-        if data=='elastic':candidate.event(season,round_number);candidate.race_raw(season,round_number)
+        if data=='hopsworks':candidate.event(season,round_number);candidate.race_raw(season,round_number)
         if features=='hopsworks':
             rows,_=candidate.pace_rows(season,round_number,clean,cutoff)
             if not rows:problem('empty_features','The selected scope has no eligible feature rows to verify. Choose a supported race/filter.',409)
@@ -93,11 +96,11 @@ class Runtime:
     def reload(self):
         settings=Settings.load() # Failure preserves the previous working configuration.
         if (settings.data_mode!='local' or settings.feature_mode!='local') and not settings.admin_ready:problem('admin_required','Cloud mode requires a PITLANE_ADMIN_TOKEN of at least 24 characters.',403)
-        self.settings=settings;self.settings_error=None;self.generation=uuid.uuid4().hex[:12];self.elastic=None;self.hops=None;self.engines={};self.checks={};self.last_feature_plan=None
+        self.settings=settings;self.settings_error=None;self.generation=uuid.uuid4().hex[:12];self.connection=None;self.source=None;self.hops=None;self.engines={};self.checks={};self.last_feature_plan=None
         self.modes={'data':settings.data_mode,'features':settings.feature_mode}
         return {'reloaded':True,'modes':dict(self.modes),'note':'Server environment overrides .env. Provider access has not yet been validated; unlock again if the operator token changed.'}
     def telemetry(self,season,round_number,session,driver,lap):
-        from .elastic_dashboard import scope,number,code_of
+        from .hops_dashboard import scope,number,code_of
         if round_number>(22 if season==2023 else 24):problem('invalid_selection','Round is outside the selected season.',422)
         filters={'season':season,'round_number':round_number,'session_name':session,'driver_code':driver,'lap_number':lap}
         rows=scope(self.reader().read('telemetry',filters),filters)
@@ -106,14 +109,14 @@ class Runtime:
             for field in ['session_time_s','speed','rpm','throttle','n_gear','x','y','z','drs']:number(r.get(field),field)
             if r.get('brake') is not None and not isinstance(r['brake'],bool):problem('schema_mismatch','Native telemetry brake must be boolean or null.')
         rows.sort(key=lambda r:r.get('session_time_s') if r.get('session_time_s') is not None else -float('inf'))
-        return {'records':rows,'record_count':len(rows),'scope':filters,'source':'Elastic event telemetry; bounded native driver/lap slice, not the public interpolated Ghost Lap','limit':self.settings.telemetry_limit}
+        return {'records':rows,'record_count':len(rows),'scope':filters,'source':'Hopsworks event telemetry; bounded native driver/lap slice, not the public interpolated Ghost Lap','limit':self.settings.telemetry_limit}
     def native_schema(self,index,season,round_number,session):
         db=self.engine();kind=index.removeprefix('f1-');db.event(season,round_number)
         filters={'season':season,'round_number':round_number,'session_name':session}
-        if kind=='telemetry':return {'index':index,'records':[],'record_count':0,'provenance':'Native Elastic telemetry requires an additional driver and lap filter. Use Connections → Native telemetry slice.','notes':['No full-session or whole-corpus telemetry download is performed.']}
+        if kind=='telemetry':return {'index':index,'records':[],'record_count':0,'provenance':'Native Hopsworks telemetry requires an additional driver and lap filter. Use Connections → Native telemetry slice.','notes':['No full-session or whole-corpus telemetry download is performed.']}
         if kind in {'sessions','results'}:rows=[r for r in getattr(db,'native_'+kind) if all(r.get(k)==v for k,v in filters.items())]
         else:rows=db.native(kind,season,round_number,session)
-        return {'index':index,'records':rows,'record_count':len(rows),'provenance':'Native configured Elastic event index; no public supplemental fields added to this schema export.','notes':['Source units preserved: lap/sector milliseconds, session-relative seconds. Native track_status is retained.']}
+        return {'index':index,'records':rows,'record_count':len(rows),'provenance':'Native configured Hopsworks event feature group; no public supplemental fields added to this schema export.','notes':['Source units preserved: lap/sector milliseconds, session-relative seconds. Native track_status is retained.']}
     def submit(self,kind,operation):
         with self.lock:
             if self.job and self.job['state'] in {'queued','running'}:problem('busy','A connection job is already running. Wait for it to finish; no duplicate write was started.',409)
@@ -165,7 +168,7 @@ class Selection(BaseModel):
     cutoff:float=Field(default=1.07,ge=1,le=1.5,allow_inf_nan=False)
 class Publish(Selection):confirm_group:str=Field(max_length=100)
 class Modes(Selection):
-    data:Literal['local','elastic']='local'
+    data:Literal['local','hopsworks']='local'
     features:Literal['local','hopsworks']='local'
 
 def submit(kind,operation):
@@ -177,7 +180,7 @@ def status(request:Request):
     d=runtime().status();d['unlocked']=authorized(request)
     if not d['unlocked']:
         # Native job/results can contain private dataset scopes. Only operator sees these.
-        for k in ['job','feature_plan','last_elastic_read','last_hopsworks_read']:d[k]=None
+        for k in ['job','feature_plan','last_source_read','last_hopsworks_read']:d[k]=None
         d['checks']={k:{'ok':v.get('ok'),'tested_at':v.get('tested_at')} for k,v in d['checks'].items()}
     return d
 
@@ -195,7 +198,7 @@ def lock(request:Request):
     same_origin(request);response=JSONResponse({'unlocked':False});response.delete_cookie(COOKIE,path='/api');return response
 
 @router.post('/test/{provider}')
-def test_provider(provider:Literal['elastic','hopsworks'],request:Request):
+def test_provider(provider:Literal['source','features'],request:Request):
     require_operator(request);return submit('test-'+provider,lambda:runtime().test(provider))
 
 @router.post('/feature-plan')

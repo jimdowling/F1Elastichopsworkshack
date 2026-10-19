@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-10-19T14:43:46.867Z",
+  "created_at": "2026-10-19T21:51:43.507Z",
   "passed": 39,
   "total": 39,
-  "duration_ms": 253,
+  "duration_ms": 138,
   "measurements": {
     "shared_time_driver_frames": 22080,
     "renderable_position_frames": 22080,

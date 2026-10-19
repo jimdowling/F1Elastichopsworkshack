@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T15:00:47.717Z",
-  "scope": "Local readiness + in-memory Elastic HTTP / Hopsworks SDK fixtures. No live provider accounts.",
-  "duration_ms": 19458,
+  "created_at": "2026-10-19T21:57:36.960Z",
+  "scope": "Local readiness + in-memory Hopsworks SDK fixtures. No live provider accounts.",
+  "duration_ms": 17413,
   "passed": 63,
   "total": 63,
   "checks": [
@@ -46,23 +46,23 @@
       "passed": true
     },
     {
-      "name": "Action accepted: test/elastic",
+      "name": "Action accepted: test/source",
       "passed": true
     },
     {
-      "name": "Job result: test/elastic",
+      "name": "Job result: test/source",
       "passed": true
     },
     {
-      "name": "Elastic readiness shows actual fixture counts",
+      "name": "Event-table readiness shows actual fixture counts",
       "passed": true
     },
     {
-      "name": "Action accepted: test/hopsworks",
+      "name": "Action accepted: test/features",
       "passed": true
     },
     {
-      "name": "Job result: test/hopsworks",
+      "name": "Job result: test/features",
       "passed": true
     },
     {
@@ -74,7 +74,7 @@
       "passed": true
     },
     {
-      "name": "Actual Elastic-backed fixture values replace public standings",
+      "name": "Actual Hopsworks-backed fixture values replace public standings",
       "passed": true
     },
     {
@@ -106,7 +106,7 @@
       "passed": true
     },
     {
-      "name": "Real feature plan shows twenty rows from active Elastic source",
+      "name": "Real feature plan shows twenty rows from active Hopsworks source",
       "passed": true
     },
     {

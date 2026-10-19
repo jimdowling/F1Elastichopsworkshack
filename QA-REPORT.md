@@ -22,7 +22,7 @@ Verified during this build on **2026-10-19**. All twelve suites below were execu
 | External browser requests required | **0** | Request interception/audits |
 | Optional cloud publishing | **Dry runs only; no real writes** | Original cloud-plan reports / offline contracts |
 
-**3,529 passing test/check assertions across twelve suites.** This aggregates Python tests and explicit JavaScript checks, not 3,529 independent end-to-end scenarios. The Python runs have a nonfailing Starlette TestClient/httpx deprecation warning. The build succeeds with the expected >500 kB lazy Three.js chunk warning; the scene is loaded only when needed.
+**3,521 passing test/check assertions across twelve suites.** This aggregates Python tests and explicit JavaScript checks, not 3,521 independent end-to-end scenarios. The Python runs have a nonfailing Starlette TestClient/httpx deprecation warning. The build succeeds with the expected >500 kB lazy Three.js chunk warning; the scene is loaded only when needed.
 
 ## New multi-car replay verification
 
@@ -156,7 +156,7 @@ The version-2.2 archive includes all 19 dashboard/connection pages, all three cu
 
 - A physically accurate car, tyre-force model, drivable racing game, surveyed Zandvoort elevation/banking or official engine recording.
 - A frame-rate guarantee, physical mobile-device testing or equivalent behavior in Safari/Firefox; browser automation used Chromium.
-- Successful connections to your Elastic or Hopsworks accounts, native dataset permissions, provider storage/Flight/Kafka access or SDK/server compatibility. Those remain your post-credential acceptance step.
+- Successful connections to your Hopsworks project, native dataset permissions, provider storage/Flight/Kafka access or SDK/server compatibility. Those remain your post-credential acceptance step.
 - Production readiness, multi-tenant security, rate limiting or public-service hardening. The demo operator authentication path is separately tested; that is not a production security certification.
 - ML generalization beyond the original Dutch GP, or fitness for live prediction. Descriptive archive coverage across 46 events is independently tested, not evidence of cross-race model accuracy.
 - Causal driver-style identification or optimal real-world pit strategies.

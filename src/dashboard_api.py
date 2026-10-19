@@ -28,7 +28,7 @@ def timing(season:int=Query(2024,ge=2023,le=2024),round:int=Query(15,ge=1,le=24)
     # Native event laps have no absolute lap endpoints. Keep this replay honestly separate.
     try:d=local_dashboard().race_view(season,round)
     except ValueError as e:raise HTTPException(422,str(e))
-    return {**d,'data_source':'public-timing-reference','source_note':'Historical timing always uses the bundled OpenF1/Jolpica replay, not the native Elastic lap index.'}
+    return {**d,'data_source':'public-timing-reference','source_note':'Historical timing always uses the bundled OpenF1/Jolpica replay, not the native Hopsworks lap feature group.'}
 
 def call(method,*args):
     try:return getattr(get_dashboard(),method)(*args)
@@ -73,42 +73,45 @@ def export(kind:Literal['results','laps','weather','pits','stints','race-control
     filename=f'pitlane-{season}-through-r{round}-{kind}.csv' if kind.endswith('-stats') else f'pitlane-{season}-r{round}-{session.lower()}-{kind}.csv'
     return Response(value,media_type='text/csv; charset=utf-8',headers={'Content-Disposition':f'attachment; filename="{filename}"'})
 
+def local_source_rows(db,kind,season,round,session):
+    """Public-archive rows in the event schema; also what load-source writes to Hopsworks."""
+    event=db.event(season,round)
+    base={'season':season,'round_number':round,'event_name':event['event_name'],'session_name':session}
+    if kind=='sessions':
+        return [{**base,'country':event['country'],'location':event['location'],'session_date':s['session_date']} for s in db.sessions if s['season']==season and s['round_number']==round and s['session_name']==session]
+    if kind=='results':
+        fields=['driver_number','driver_code','full_name','team_name','position','points','grid_position','status','fastest_lap_ms']
+        return [{**base,**{k:r.get(k) for k in fields}} for r in db.classifications(season,round,session)]
+    if kind=='laps':
+        fields=['driver_code','team_name','lap_number','lap_duration_ms','duration_sector_1','duration_sector_2','duration_sector_3','compound','tyre_life','is_pit_out_lap','is_pit_in_lap','track_status','position']
+        return [{**base,**{k:r.get(k) for k in fields}} for r in db.race_raw(season,round)['laps']] if session=='Race' else []
+    if kind=='weather':
+        fields=['session_time_s','air_temperature','track_temperature','humidity','pressure','wind_speed','wind_direction','rainfall']
+        return [{**base,**{k:r.get(k) for k in fields},'rainfall':None if r.get('rainfall') is None else bool(r['rainfall'])} for r in db.weather_view(season,round,session)['rows']]
+    rows=[]
+    if season==2024 and round==15 and session=='Race':
+        ghosts=read(ROOT/'data/ghosts.json');laps=db.race_raw(season,round)['laps']
+        for code,g in ghosts.items():
+            lap=next((l for l in laps if l['driver_code']==code and l['lap_number']==g['lap_number']),None)
+            if lap is None or lap['lap_start_s'] is None:continue
+            tr=g['trace']
+            for i,t in enumerate(tr['time']):
+                rows.append({**base,'driver_code':code,'team_name':lap['team_name'],'lap_number':g['lap_number'],'session_time_s':round_float(lap['lap_start_s']+t),
+                    'speed':int(tr['speed'][i]+.5),'rpm':int(tr['rpm'][i]+.5),'throttle':max(0,min(100,int(tr['throttle'][i]+.5))),'brake':tr['brake'][i]>.5,'n_gear':int(tr['gear'][i]+.5),
+                    'drs':None,'x':tr['x'][i],'y':tr['y'][i],'z':None,'is_interpolated':True})
+    return rows
+
 @router.get('/schema/{index}.json')
 def schema_export(index:Literal['f1-sessions','f1-results','f1-laps','f1-weather','f1-telemetry'],season:int=Query(2024,ge=2023,le=2024),round:int=Query(15,ge=1,le=24),session:Literal['Race','Qualifying']='Race'):
     from .connections import runtime
-    if runtime().modes['data']=='elastic':return runtime().native_schema(index,season,round,session)
-    db=get_dashboard()
-    try:event=db.event(season,round)
+    if runtime().modes['data']=='hopsworks':return runtime().native_schema(index,season,round,session)
+    try:rows=local_source_rows(get_dashboard(),index.removeprefix('f1-'),season,round,session)
     except ValueError as e:raise HTTPException(422,str(e))
-    base={'season':season,'round_number':round,'event_name':event['event_name'],'session_name':session}
-    if index=='f1-sessions':
-        rows=[{**base,'country':event['country'],'location':event['location'],'session_date':s['session_date']} for s in db.sessions if s['season']==season and s['round_number']==round and s['session_name']==session]
-    elif index=='f1-results':
-        fields=['driver_number','driver_code','full_name','team_name','position','points','grid_position','status','fastest_lap_ms']
-        rows=[{**base,**{k:r.get(k) for k in fields}} for r in db.classifications(season,round,session)]
-    elif index=='f1-laps':
-        fields=['driver_code','team_name','lap_number','lap_duration_ms','duration_sector_1','duration_sector_2','duration_sector_3','compound','tyre_life','is_pit_out_lap','is_pit_in_lap','track_status','position']
-        rows=[{**base,**{k:r.get(k) for k in fields}} for r in db.race_raw(season,round)['laps']] if session=='Race' else []
-    elif index=='f1-weather':
-        fields=['session_time_s','air_temperature','track_temperature','humidity','pressure','wind_speed','wind_direction','rainfall']
-        rows=[{**base,**{k:r.get(k) for k in fields},'rainfall':None if r.get('rainfall') is None else bool(r['rainfall'])} for r in db.weather_view(season,round,session)['rows']]
-    else:
-        rows=[]
-        if season==2024 and round==15 and session=='Race':
-            ghosts=read(ROOT/'data/ghosts.json');laps=db.race_raw(season,round)['laps']
-            for code,g in ghosts.items():
-                lap=next((l for l in laps if l['driver_code']==code and l['lap_number']==g['lap_number']),None)
-                if lap is None or lap['lap_start_s'] is None:continue
-                tr=g['trace']
-                for i,t in enumerate(tr['time']):
-                    rows.append({**base,'driver_code':code,'team_name':lap['team_name'],'lap_number':g['lap_number'],'session_time_s':round_float(lap['lap_start_s']+t),
-                        'speed':int(tr['speed'][i]+.5),'rpm':int(tr['rpm'][i]+.5),'throttle':max(0,min(100,int(tr['throttle'][i]+.5))),'brake':tr['brake'][i]>.5,'n_gear':int(tr['gear'][i]+.5),
-                        'drs':None,'x':tr['x'][i],'y':tr['y'][i],'z':None,'is_interpolated':True})
-    payload={'index':index,'records':rows,'record_count':len(rows),'provenance':'Public OpenF1/Jolpica equivalents; not the event cluster and not native FastF1 records.',
+    payload={'index':index,'records':rows,'record_count':len(rows),'provenance':'Public OpenF1/Jolpica equivalents; not the Hopsworks event tables and not native FastF1 records.',
         'notes':['Unknown fields stay null. Sector/lap durations are milliseconds. Relative time uses the OpenF1 session start date.',
             'Race lap position is an as-of join. Native FastF1 track_status is unavailable.',
             'Qualifying lap samples are not loaded; qualifying results/weather are available.',
-            'Telemetry export is limited to four interpolated 2024 Dutch GP laps, not the full event telemetry index.']}
+            'Telemetry export is limited to four interpolated 2024 Dutch GP laps, not the full event telemetry corpus.']}
     return JSONResponse(payload,headers={'Content-Disposition':f'attachment; filename="{index}-{season}-r{round}-{session.lower()}.json"'})
 
 def round_float(value):return float(f'{value:.6f}')

@@ -1,12 +1,12 @@
 # F1Elastichopsworkshack — PITLANE
 
-[Live demo](https://fihackdemo.kiranreddy.nl) · [Static GitHub Pages overview](https://knarayanareddy.github.io/F1Elastichopsworkshack/) · [Workflow slide](./presentation/Elastic-Hopsworks-Workflow.pptx)
+[Live demo](https://fihackdemo.kiranreddy.nl) · [Static GitHub Pages overview](https://knarayanareddy.github.io/F1Elastichopsworkshack/)
 
 > The public demo uses a temporary Cloudflare Tunnel to the FastAPI server on the demo Mac; it is available only while that host and tunnel are online. GitHub Pages itself is static. Provider credentials remain server-side and are not published.
 
 ---
 
-**An explorable 2023–2024 race workspace, plus four fully working 2024 Dutch GP experiments.** Version 2.2 expands Ghost Lap with four-car comparison and a synchronized 20-car race replay, while retaining the configurable Elastic/Hopsworks runtime and original analytics.
+**An explorable 2023–2024 race workspace, plus four fully working 2024 Dutch GP experiments.** Version 2.2 expands Ghost Lap with four-car comparison and a synchronized 20-car race replay, while retaining the configurable Hopsworks runtime and original analytics.
 
 ## New / multi-car Ghost Lap
 
@@ -30,7 +30,7 @@ python -m pip install -r requirements-integrations.txt
 python scripts/connect_cloud.py init
 ```
 
-Open the generated private `.env`, add your Elastic source URL/key and Hopsworks host/project/key, choose your own feature prefix, and restart the server. In **Connections**, unlock with the separate generated operator token, test access, activate Elastic + local features, explicitly publish/read back one pace batch, then activate Hopsworks. Provider keys never go into the frontend.
+Open the generated private `.env`, add your Hopsworks host/project/key (and the event table names if they differ from `f1_sessions`, `f1_results`, `f1_laps`, `f1_weather`, `f1_telemetry`), choose your own feature prefix, and restart the server. In **Connections**, unlock with the separate generated operator token, test the event tables and feature store, activate Hopsworks data + local features, explicitly publish/read back one pace batch, then activate Hopsworks features. Provider keys never go into the frontend.
 
 **Full instructions:** [docs/CLOUD-SETUP.md](docs/CLOUD-SETUP.md). That guide covers exact environment variables, permissions, SDK compatibility, read/write boundaries, safe recovery, bounded native telemetry and CLI alternatives. Cloud mode powers the historical dashboard and its pace summaries; historical timing and the four original experiments retain their separately labeled public snapshots.
 
@@ -71,11 +71,11 @@ Unsupported reference modules were **replaced**, not filled with invented data: 
 | Pace / DNA models | Actually fitted and evaluated on the original **one-race** snapshot; no two-season generalization claim |
 | Pitwall outcomes | **Modeled counterfactuals**, not observed or causally validated alternatives |
 | Default runtime | Local JSON/SQLite, available without any credentials |
-| Configurable cloud runtime | Read-only native Elastic results/laps/weather + labeled public supplements; dashboard pace summaries can consume **actual verified Hopsworks read-back** |
+| Configurable cloud runtime | Read-only native Hopsworks event tables (results/laps/weather) + labeled public supplements; dashboard pace summaries can consume **actual verified Hopsworks read-back** |
 | Connection validation | Runtime adapters and UI are tested against offline HTTP/SDK fixtures; real Hopsworks SDK import/API shape checked; **your accounts still need live validation** |
 | Original-lab publisher | Separate optional script for the original four feature groups; it does not switch the original experiments to cloud execution |
 
-The event's advertised 57M telemetry rows have **not** been loaded. The **bundled archive** has Qualifying classifications/weather but no Qualifying lap samples. Once configured, native Qualifying laps are exportable from Elastic, and Connections can read/plot/export a bounded single driver/lap telemetry slice. Missing channels, incomplete stints and insufficient Track DNA evidence are visible rather than fabricated. The workbench documents these boundaries alongside the supplied schema.
+The event's advertised 57M telemetry rows have **not** been loaded. The **bundled archive** has Qualifying classifications/weather but no Qualifying lap samples. Once configured, native Qualifying laps are exportable from the Hopsworks `f1_laps` table, and Connections can read/plot/export a bounded single driver/lap telemetry slice. Missing channels, incomplete stints and insufficient Track DNA evidence are visible rather than fabricated. The workbench documents these boundaries alongside the supplied schema.
 
 Default/local mode makes no provider calls. Cloud mode is explicit, requires server-side credentials and protects native dashboard access with an operator session. Hopsworks writes require a server write flag plus explicit name confirmation (or the documented CLI --write flow); publishing alone does not switch modes. This is an independent exploratory prebuild, **not certified compliant with the event's event-day-code rule**.
 
@@ -171,15 +171,15 @@ Public 2023–2024 archive                 Original 2024 Dutch GP snapshot
 | `app.py` | API, validation, exports, and static-site hosting |
 | `src/race_replay.py`, `scripts/prepare_race_replay.py`, `data/replay/` | Public shared-clock 20-driver replay API, paced importer and compact curated streams |
 | `frontend/src/replay/GhostWorkspace.jsx`, `FleetScene.jsx`, `fleetModel.js` | Separate ghost/race modes, multi-car 3D/2D and gap-safe frame logic |
-| `src/settings.py`, `src/remote.py` | Server-only configuration, bounded read-only Elastic client, explicit-write/value-verified Hopsworks batches |
-| `src/elastic_dashboard.py`, `src/connections.py` | Native event adapters, labeled supplements, authenticated control jobs and runtime mode switching |
-| `scripts/connect_cloud.py`, `docs/CLOUD-SETUP.md` | Private .env initializer, read-only checks, feature plan/publish and deployment guide |
+| `src/settings.py`, `src/remote.py` | Server-only configuration, bounded read-only Hopsworks event-table reader, explicit-write/value-verified Hopsworks pace batches |
+| `src/hops_dashboard.py`, `src/connections.py` | Native event adapters, labeled supplements, authenticated control jobs and runtime mode switching |
+| `scripts/connect_cloud.py`, `docs/CLOUD-SETUP.md` | Private .env initializer, read-only checks, event-table loader, feature plan/publish and deployment guide |
 | `src/dashboard.py`, `src/dashboard_api.py` | Two-season archive analytics, local feature read-back, validation and schema/CSV APIs |
 | `frontend/src/dashboard/` | Historical pages, shared controls, replay clock and responsive themes |
 | `data/dashboard/` | Public archive and 93-file SHA-256 manifest |
 | `docs/DASHBOARD-GUIDE.md` | Reference-feature map, field units, source limits and hackathon migration guide |
 | `src/engine.py` | Feature engineering, persisted read-backs, models, simulation, and metrics |
-| `src/cloud.py` | Optional Elastic/Hopsworks publishing bridges |
+| `src/cloud.py` | Optional Hopsworks publishing: event-table loader and original-lab feature groups |
 | `frontend/src/main.jsx` | Four interactive applications and shared UI |
 | `frontend/src/styles.css` | Shared responsive styling |
 | `frontend/src/replay/` | Lazy-loaded Three.js scene, procedural models, Web Audio engine and replay styling |
@@ -228,7 +228,7 @@ node tests/fleet-browser.mjs
 node tests/replay-browser.mjs
 ```
 
-**3,529 passing tests/check assertions across twelve suites:** 104 dashboard Python/API tests, 2,846 dashboard-model checks, 137 dashboard browser checks, 73 new connection/security/adapter tests, 63 connection browser checks, plus 50 race-archive/API tests, 39 multi-car model checks (including 22,080 sampled driver frames), 41 multi-car browser checks, and the original 60 Python / 25 browser / 48 geometry / 43 replay-audio checks. The timing model audits every one of the 2,739 intermediate lap frames across all 46 events, including restart inconsistencies. Browser automation exercises all 19 dashboard/connection routes at desktop/mobile widths, actual API requests, downloads, filters, recovery, preferences and the unchanged lab scope. It also measures native Web Audio output and real WebGL rendering. See [QA-REPORT.md](QA-REPORT.md) for evidence and limits.
+**3,521 passing tests/check assertions across twelve suites:** 104 dashboard Python/API tests, 2,846 dashboard-model checks, 137 dashboard browser checks, 66 Hopsworks connection/security/adapter tests, 63 connection browser checks, plus 50 race-archive/API tests, 39 multi-car model checks (including 22,080 sampled driver frames), 41 multi-car browser checks, and the original 60 Python / 25 browser / 48 geometry / 43 replay-audio checks. The timing model audits every one of the 2,739 intermediate lap frames across all 46 events, including restart inconsistencies. Browser automation exercises all 19 dashboard/connection routes at desktop/mobile widths, actual API requests, downloads, filters, recovery, preferences and the unchanged lab scope. It also measures native Web Audio output and real WebGL rendering. See [QA-REPORT.md](QA-REPORT.md) for evidence and limits.
 
 ### Offline integration browser suite
 
@@ -273,16 +273,15 @@ This writes `../pitlane-lab.zip` containing source, compiled assets, curated obs
 
 ## Cloud runtime versus the original-lab publisher
 
-Use **Connections** and `scripts/connect_cloud.py` for the new dashboard runtime. See [docs/CLOUD-SETUP.md](docs/CLOUD-SETUP.md) for the full setup. The source reader never writes to event indices. Hopsworks batches use a unique team prefix and validated source/filter identities, and GET requests never auto-publish missing features.
+Use **Connections** and `scripts/connect_cloud.py` for the new dashboard runtime. See [docs/CLOUD-SETUP.md](docs/CLOUD-SETUP.md) for the full setup. The source reader never writes to the Hopsworks event tables. Hopsworks batches use a unique team prefix and validated source/filter identities, and GET requests never auto-publish missing features.
 
 The older `scripts/publish_cloud.py` remains available for the original Dutch GP lab's feature groups. Its default is a network-free dry run:
 
 ```bash
-python scripts/publish_cloud.py --target elastic --prefix pitlane_yourteam
-python scripts/publish_cloud.py --target hopsworks --prefix pitlane_yourteam
+python scripts/publish_cloud.py --prefix pitlane_yourteam
 ```
 
-Actual legacy publishing requires `--write`, the optional dependencies and your own writable destination. Legacy Elastic destination variables are `ELASTICSEARCH_URL/API_KEY`; do **not** put the organizer's read-only source there when running that publisher. New canonical read-source variables are `ELASTIC_SOURCE_URL/API_KEY`. The original lab pipeline stays local after legacy publishing; it is distinct from the dashboard's configurable pace-feature backend.
+Actual publishing requires `--write`, the optional dependencies and the Hopsworks variables in `.env`. The original lab pipeline stays local after legacy publishing; it is distinct from the dashboard's configurable pace-feature backend.
 
 No accounts, deployments or billable cloud resources are provisioned automatically. Real account permissions, schema, connectivity and SDK/server compatibility must be checked when credentials arrive. The installed Hopsworks SDK 5.2.1 was imported and its API surface inspected; provider login and storage/network access remain unverified against live accounts.
 

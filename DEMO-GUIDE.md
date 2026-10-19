@@ -12,9 +12,9 @@ Open the live preview. The default is the **2023–2024 historical dashboard**; 
 
 ## New in 2.1 / Connections
 
-Open **Connections** to see server-side credential readiness without exposing any keys. When credentials arrive, follow [docs/CLOUD-SETUP.md](docs/CLOUD-SETUP.md): create the private `.env`, test read access, explicitly activate Elastic, preview/publish/verify one isolated Hopsworks batch, then activate Hopsworks for the dashboard pace panel. Missing batches and connection failures are visible; the app never silently falls back to public data.
+Open **Connections** to see server-side credential readiness without exposing any keys. When credentials arrive, follow [docs/CLOUD-SETUP.md](docs/CLOUD-SETUP.md): create the private `.env`, test the event tables, explicitly activate Hopsworks data, preview/publish/verify one isolated Hopsworks batch, then activate Hopsworks for the dashboard pace panel. Missing batches and connection failures are visible; the app never silently falls back to public data.
 
-Before credentials, buttons remain safely disabled. No provider accounts were connected for this delivery. After configuration, native Elastic telemetry can be inspected for one driver/lap at a time. Historical timing and the four original 3D/ML experiments keep their public Dutch GP scope; this is not a claim that every original model has moved to cloud execution.
+Before credentials, buttons remain safely disabled. No provider accounts were connected for this delivery. After configuration, native Hopsworks telemetry can be inspected for one driver/lap at a time. Historical timing and the four original 3D/ML experiments keep their public Dutch GP scope; this is not a claim that every original model has moved to cloud execution.
 
 ## A five-minute dashboard tour
 
@@ -23,14 +23,14 @@ Before credentials, buttons remain safely disabled. No provider accounts were co
 3. **Historical timing:** return to 2024 R15, play the race or scrub to lap 40, then open Norris's lap evidence. Say “historical timing replay,” not “live timing.” The final frame switches explicitly to official classification.
 4. **Race pace:** select several drivers, change the pit/outlier filter and compare distributions, positions and speed traps. Point to the persisted feature read-back. This is retrospective observed pace, not a fuel-corrected estimate.
 5. **Tyres / Pit-lane / Weather / Race control:** show stint lengths, lane visits, Race versus Qualifying weather, and a searchable race-control message. Pit-lane duration is not stationary crew service time.
-6. **Coverage & schema:** show 46 events / 51,108 Race laps and the five-index mapping. Preview actual records, export JSON, copy the ES|QL template and build/read back local race features. Disclose the active source/feature modes. Default mode is SQLite; configured cloud mode shows native-source/read-back evidence.
+6. **Coverage & schema:** show 46 events / 51,108 Race laps and the five-table mapping. Preview actual records, export JSON, copy the Hopsworks query template and build/read back local race features. Disclose the active source/feature modes. Default mode is SQLite; configured cloud mode shows native-source/read-back evidence.
 7. **Ghost Lap:** switch to the original Dutch GP 3D experience, enable sound explicitly and try a chase camera. Its scope remains fixed even after changing the historical dashboard selectors.
 
 For the complete feature adaptation, methodology, known gaps and API contract, read [docs/DASHBOARD-GUIDE.md](docs/DASHBOARD-GUIDE.md). Dark/light themes, collapsed navigation and mobile layouts are functional.
 
 ### The honest hackathon story
 
-“The public archive lets us explore the same kinds of seasons, sessions, laps, results, weather and telemetry fields described by the event schema. We can choose one focused experience, then configure the included native adapters and verify a real Elastic query and Hopsworks feature-group read-back against our accounts. This local prebuild is not evidence that those cloud steps have happened.”
+“The public archive lets us explore the same kinds of seasons, sessions, laps, results, weather and telemetry fields described by the event schema. We can choose one focused experience, then configure the included native adapters and verify a real Hopsworks event-table query and feature-group read-back against our project. This local prebuild is not evidence that those cloud steps have happened.”
 
 The advertised 57M telemetry corpus is **not** loaded: the dashboard telemetry export is four interpolated Dutch GP laps. The original ML retains its one-race holdout. Confirm the event-day-code rule before reusing any prebuilt repository.
 
@@ -42,7 +42,7 @@ The advertised 57M telemetry corpus is **not** loaded: the dashboard telemetry e
 |---|---|---|
 | **Ghost Lap** | Follow 3D open-wheel cars around the circuit and hear the recorded RPM shape their engine sound. | **Strongest immediate visual impact.** |
 | **Pitwall Sandbox** | Someone picks a pit lap and tyre; the entire scenario recalculates. | **Best collaborative what-if demo**, but the assumptions need careful explanation. |
-| **Pace Detective** | Click a surprising real lap and show exactly which earlier laps informed the expectation. | **Safest small hack-night project**, with a clear Elastic/Hopsworks story. |
+| **Pace Detective** | Click a surprising real lap and show exactly which earlier laps informed the expectation. | **Safest small hack-night project**, with a clear Hopsworks story. |
 | **Driver DNA** | Hide the identity, get an audience vote, then reveal the actual driver and model vote. | **Best interactive reveal** and a useful classification discussion. |
 
 The assessments above are recommendations, not official judging scores. You can star ideas in the app; **Compare ideas** shows their intended platform roles, risks, and relative event-build effort.
@@ -69,7 +69,7 @@ The assessments above are recommendations, not official judging scores. You can 
 
 **Local end-to-end path:** observations → `ghost_features` → persisted read-back → replay API → 3D cars + engine audio + live instruments + synchronized SVG charts / 2D map.
 
-**Event-sized version:** one driver pair, one selected lap each, one replay, one speed/delta chart. Elastic retrieves the records; Hopsworks stores useful aligned/aggregated telemetry features. This exploratory build includes a 3D renderer, but leave a drivable game/physics engine out of the two-hour event scope.
+**Event-sized version:** one driver pair, one selected lap each, one replay, one speed/delta chart. Hopsworks event tables supply the records; a Hopsworks feature group stores useful aligned/aggregated telemetry features. This exploratory build includes a 3D renderer, but leave a drivable game/physics engine out of the two-hour event scope.
 
 ---
 
@@ -124,7 +124,7 @@ A useful demo is ZHO, lap 64, under the forest: an observed **79.340 s** lap ver
 
 **Local end-to-end path:** observations → `pace_features` → persisted read-back → train/score/evaluate → searchable `pace_results` → evidence dashboard.
 
-**Event-sized version:** rolling baseline first; meaningful Feature Group read-back; one Kibana view with actual/expected pace and a residual table. Add the forest only after the pipeline and demo work.
+**Event-sized version:** rolling baseline first; meaningful Feature Group read-back; one dashboard view with actual/expected pace and a residual table. Add the forest only after the pipeline and demo work.
 
 ---
 
@@ -168,7 +168,7 @@ Click **Data & provenance**:
 - 1,425 real lap rows; 275 telemetry laps; **zero synthetic race observations**.
 - OpenF1/Jolpica sources and SHA-256 checksums.
 - The distinction between observations, interpolation, derived features, and simulation.
-- The explicit infrastructure boundary: **SQLite substitutes for Elastic and Hopsworks here**.
+- The explicit infrastructure boundary: **SQLite substitutes for Hopsworks here**.
 
 Optional cloud publishing bridges are in the source package. They have offline contract/dry-run checks, not successful live-account tests. They do not automatically switch the app to cloud search or inference.
 

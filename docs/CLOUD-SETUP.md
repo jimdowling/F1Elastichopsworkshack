@@ -1,8 +1,13 @@
-# Pitlane 2.2 — configure Elastic + Hopsworks when credentials arrive
+# Pitlane 2.2 — configure Hopsworks
 
-**The runtime connection layer is implemented. You do not need to edit application code to configure the documented event schema.** You will need valid accounts, compatible SDK/server versions, network access and the permissions below. Live account validation has **not** occurred in this delivery.
+**The runtime connection layer is implemented. You do not need to edit application code to point the app at the event tables in your Hopsworks project.** You need a valid Hopsworks project, a compatible SDK/server version, network access and the permissions below.
 
-The app still starts in local mode without credentials. Open **Connections** in the dashboard for configuration readiness, protected connection tests, actual source counts, feature planning/publishing/read-back, mode activation and bounded native telemetry.
+One Hopsworks project does two jobs:
+
+- **Event data source.** Five read-only feature groups (tables) hold the F1 event data: `f1_sessions`, `f1_results`, `f1_laps`, `f1_weather` and `f1_telemetry`.
+- **Feature store for derived features.** The dashboard writes and reads back its per-driver pace summaries in your team's `<prefix>_race_pace` feature group.
+
+The app still starts in local mode without credentials. Open **Connections** in the dashboard to see configuration readiness and to run protected connection tests, table schema checks and row counts, feature planning/publishing/read-back, mode activation and bounded native telemetry reads.
 
 ## Quick setup
 
@@ -18,34 +23,38 @@ python scripts/connect_cloud.py init
 
 `init` creates `.env` with a random **operator token** and restrictive file permissions where supported. It **never overwrites** an existing `.env`. It makes no cloud calls and does not print any token or provider key. Open that file privately in your editor.
 
-Python 3.11+ is recommended. This build installed/imported **Hopsworks SDK 5.2.1 on Python 3.13** and checked the SDK methods used by the adapter. This is an SDK import/API-shape check, **not** proof that your deployment accepts that version. The optional dependency range is `hopsworks[python]>=4.8,<6`; pin the version recommended for your Hopsworks deployment if its major/minor differs. Use a virtual environment, not your system Python.
+Python 3.11+ is recommended. The optional dependency range is `hopsworks[python]>=4.8,<6`. If your Hopsworks deployment uses a different major/minor version, pin the SDK version it recommends. Use a virtual environment, not your system Python.
 
 ### 2. Fill in these server-side values
 
 ```dotenv
-# Keep both local while checking the accounts.
+# Keep both local while checking the project.
 PITLANE_DATA_MODE=local
 PITLANE_FEATURE_MODE=local
 
-# The read-only event source: Elasticsearch endpoint, NOT Kibana's /app URL.
-ELASTIC_SOURCE_URL=https://your-cluster-endpoint
-ELASTIC_SOURCE_API_KEY=your-encoded-api-key
-
-# Your team-owned Hopsworks project. Hostname, not a URL/path.
+# Your Hopsworks project. Hostname, not a URL/path.
 HOPSWORKS_HOST=your-hopsworks-host
 HOPSWORKS_PROJECT=your-project-name
 HOPSWORKS_API_KEY=your-hopsworks-key
+
+# Event tables in that project (defaults shown; change them to match your tables).
+HOPSWORKS_FG_SESSIONS=f1_sessions
+HOPSWORKS_FG_RESULTS=f1_results
+HOPSWORKS_FG_LAPS=f1_laps
+HOPSWORKS_FG_WEATHER=f1_weather
+HOPSWORKS_FG_TELEMETRY=f1_telemetry
+HOPSWORKS_FG_VERSION=1
 
 # Choose your own namespace. The placeholder pitlane_yourteam cannot publish.
 PITLANE_FEATURE_PREFIX=pitlane_unique_team
 PITLANE_FEATURE_VERSION=1
 PITLANE_ALLOW_FEATURE_WRITES=false
 
-# Keep the random token written by init. This is NOT either provider API key.
+# Keep the random token written by init. This is NOT the Hopsworks API key.
 PITLANE_ADMIN_TOKEN=the-generated-operator-token
 ```
 
-Do **not** add the `ApiKey ` prefix to the Elastic key value; the backend adds the authorization scheme. Use the encoded API-key string supplied by Elastic/organizers, not an API-key ID by itself. Do not use `VITE_` variables: those can be compiled into browser assets.
+Do not use `VITE_` variables: those can be compiled into browser assets.
 
 Start/restart the app after the first configuration:
 
@@ -53,101 +62,106 @@ Start/restart the app after the first configuration:
 python -m uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-Open `http://localhost:8000/#connections` on your computer, or the Arena live preview's **Connections** page. If the server is only for your own machine, binding to `127.0.0.1` instead is safer; Arena live previews require `0.0.0.0`. Keep this demo private or behind an authenticated reverse proxy for wider deployment.
+Open `http://localhost:8000/#connections`. If the server is only for your own machine, binding to `127.0.0.1` is safer. For a wider deployment, keep this demo private or put it behind an authenticated reverse proxy.
 
 ### 3. Unlock and verify, without writes
 
-1. Enter **PITLANE_ADMIN_TOKEN** into the operator-token field. Never enter an Elastic/Hopsworks API key there.
-2. Click **Test Elastic read access**. This checks mappings and actual 2023–2024 document counts for the five configured indices.
-3. Click **Test Hopsworks access**. This authenticates and obtains the feature-store handle; it does **not** create a feature group, and does not by itself prove offline-data read/write access.
-4. Select **Elastic event indices + Local SQLite**, choose a known event such as **2024 R15**, and click **Verify & activate modes**. The candidate metadata/lap/weather reads must succeed before the server switches. A failure leaves the previous modes unchanged.
-5. Open Race pace or Weather: those now consume the configured Elastic source. The active provider and public supplements are displayed.
+1. Enter **PITLANE_ADMIN_TOKEN** into the operator-token field. Never enter the Hopsworks API key there.
+2. Click **Test event table access**. For each of the five configured feature groups, this checks that it exists, that its schema has the required features with compatible types, and how many 2023–2024 rows it holds (counted with a server-side season filter). Telemetry gets a schema check only and is never counted or downloaded in full.
+3. Click **Test feature store access**. This authenticates and obtains the feature-store handle. It does **not** create a feature group, and on its own it does not prove you can read or write offline data.
+4. Select **Hopsworks event tables + Local SQLite**, choose a known event such as **2024 R15**, and click **Verify & activate modes**. The server switches only after the candidate metadata, lap and weather reads succeed. If any read fails, the previous modes stay in place.
+5. Open Race pace or Weather. Those pages now use the Hopsworks event tables, and they show the active provider and any public supplements.
 
-The protected controls run jobs in the background and display actual queued/running/succeeded/failed states. SDK operations can take minutes. Do not repeatedly click Publish; concurrent control jobs are rejected. A provider may continue an accepted job after a process shutdown—check the provider's job UI before retrying.
+The protected controls run jobs in the background and show their real state: queued, running, succeeded or failed. SDK operations can take minutes. Don't click Publish repeatedly; the server rejects concurrent control jobs. A Hopsworks job that was already accepted may keep running after the process shuts down, so check the Hopsworks job UI before retrying.
+
+If your project does not yet hold the event tables, load the bundled public archive into them (see **Load the event tables** below).
 
 ### 4. Publish one real feature batch and consume its read-back
 
 1. In Connections, set the feature season/round, pit/outlier toggle and cutoff. Use **Preview feature plan**. Check the active source mode, row count and isolated destination. Planning performs no cloud writes.
-2. When you authorize Hopsworks writes, set `PITLANE_ALLOW_FEATURE_WRITES=true` in `.env`. Restart, or use **Reload server configuration** while still authenticated. Reload restores modes from `.env`, so re-activate Elastic if `.env` still says local.
-3. Type the exact displayed destination name, for example **`pitlane_unique_team_race_pace`**, and click **Publish & verify batch**.
-4. Wait for success. The code creates/gets that group/version, inserts the selected descriptive pace rows, waits for the SDK write job, then reads the **specific batch** back and verifies **IDs, counts, payloads and numeric values**. It does not switch modes automatically.
-5. Select **Elastic event indices + Hopsworks verified read-back**, then **Verify & activate modes**.
-6. Open Race pace. Its summaries/comparison bars/distributions now consume the Hopsworks read-back; the **Feature storage** metric says Hopsworks. Raw lap curves still come from Elastic.
+2. When you authorize Hopsworks writes, set `PITLANE_ALLOW_FEATURE_WRITES=true` in `.env`. Restart, or use **Reload server configuration** while still authenticated. Reload restores modes from `.env`, so if `.env` still says local, activate Hopsworks data again.
+3. Type the exact destination name shown, for example **`pitlane_unique_team_race_pace`**, and click **Publish & verify batch**.
+4. Wait for success. The server gets or creates that group/version, inserts the selected pace summary rows and waits for the SDK write job. It then reads back that **specific batch** and verifies **IDs, counts, payloads and numeric values**. It does not switch modes automatically.
+5. Select **Hopsworks event tables + Hopsworks verified read-back**, then **Verify & activate modes**.
+6. Open Race pace. Its summaries, comparison bars and distributions now use the Hopsworks read-back, and the **Feature storage** metric shows Hopsworks. Raw lap curves come from the `f1_laps` table.
 
-**One batch belongs to one exact source snapshot + race + filter.** Changing the race or cutoff without publishing its batch produces a visible missing-feature error; GET requests never silently create a group or publish data. Return to Connections, preview/publish the new selection, or explicitly switch features to local mode. Feature IDs bind the exact source-lap digest, namespace, row values and filter, preventing stale or cross-dataset reuse.
+**Each batch belongs to one exact source snapshot, race and filter.** If you change the race or cutoff without publishing a batch for it, the dashboard shows a missing-feature error. GET requests never create a group or publish data on their own. To fix the error, go back to Connections and preview/publish the new selection, or switch features to local mode. Feature IDs bind together the source-lap digest, namespace, row values and filter, so a batch can't be reused for a different dataset or a stale one.
 
-Read results are cached for the configured TTL (default five minutes). Reloading/restarting clears the cache and forces a new provider read. If a successful write is not immediately readable, leave features local, check the provider job/storage state, then retry activation. Do not treat a write acknowledgment as proof of usable features.
+Read results are cached for the configured TTL (default five minutes). Reloading or restarting clears the cache and forces a fresh read. If a successful write can't be read back immediately, leave features local, check the job and storage state in Hopsworks, then retry activation. A write acknowledgment alone does not prove the features are usable.
 
 ### 5. Persist the working modes
 
-UI switches apply to the **running server**, not just one browser. They do not edit `.env`:
+Mode switches in the UI apply to the **running server**, not just one browser. They do not edit `.env`. To keep them across restarts, set:
 
 ```dotenv
-PITLANE_DATA_MODE=elastic
+PITLANE_DATA_MODE=hopsworks
 PITLANE_FEATURE_MODE=hopsworks
 ```
 
-Set those only after the corresponding feature batches/read permissions have been verified. Restart and unlock Connections again. Cloud-mode dashboard endpoints require the operator session; static assets and the original public-data labs remain available.
+Set these only after you have verified the event tables and the feature batches. Then restart and unlock Connections again. Cloud-mode dashboard endpoints require the operator session. Static assets and the original public-data labs remain available without it.
 
-To recover locally, explicitly activate local/local or put both values back to `local` and restart. There is no automatic fallback that would misrepresent local data as a working cloud connection.
+To go back to local data, activate local/local in Connections, or set both values back to `local` and restart. There is no automatic fallback, so local data is never shown as if it came from a working cloud connection.
+
+## Load the event tables
+
+Skip this if your project already holds the event tables. Otherwise, the CLI can write the bundled public 2023–2024 archive into the five source feature groups, using the same event schema the reader expects:
+
+```bash
+# Dry run: per-table row counts and feature names, no provider calls.
+python scripts/connect_cloud.py load-source
+
+# Optional narrowing.
+python scripts/connect_cloud.py load-source --season 2024 --kind laps --kind weather
+
+# Actual write: requires PITLANE_ALLOW_FEATURE_WRITES=true.
+python scripts/connect_cloud.py load-source --write
+```
+
+Each table gets primary key `id` (a stable hash of the natural key: season/round/session plus driver, lap or timestamp as appropriate) and online serving is disabled. Integer, boolean and string features use explicit nullable types. After each insert, the loader reads back the `id` column to verify it. The public archive has no Qualifying lap samples. Its telemetry consists of only the four interpolated 2024 Dutch GP comparison laps.
 
 ## What actually changes—and what stays separate
 
-| Area | With Elastic data mode | With Hopsworks feature mode |
+| Area | With Hopsworks data mode | With Hopsworks feature mode |
 |---|---|---|
-| Race/Qualifying classifications | Native `f1-results`; standings use those Race points | No change |
-| Calendar/session metadata | Native `f1-sessions` joined to public venue metadata | No change |
-| Race lap analysis / positions / native track_status | Native `f1-laps`, fetched only for selected sessions | Per-driver pace summaries are read from the verified feature batch |
-| Qualifying lap JSON | Native `f1-laps` selected by Qualifying, when present | No change |
-| Race/Qualifying weather | Native `f1-weather` | No change |
-| Tyre segments | Derived contiguous segments from native compound, tyre-life and pit flags | Not certified physical tyre-set identity |
-| Native telemetry | Connections reads/plots/downloads a **single driver/lap** from `f1-telemetry` | Not implicitly published |
-| Sprint points, Q1/Q2/Q3, result elapsed times/lap totals, speed traps, pit-transit timings, race-control messages | **Explicit public supplements**: these are not all in the advertised five-index schema | No claim that they came from Hopsworks |
+| Race/Qualifying classifications | Native `f1_results`; standings use those Race points | No change |
+| Calendar/session metadata | Native `f1_sessions` joined to public venue metadata | No change |
+| Race lap analysis / positions / native track_status | Native `f1_laps`, read only for the selected session | Per-driver pace summaries are read from the verified feature batch |
+| Qualifying lap JSON | Native `f1_laps` filtered to Qualifying, when present | No change |
+| Race/Qualifying weather | Native `f1_weather` | No change |
+| Tyre segments | Contiguous segments derived from the native compound, tyre-life and pit flags | Not certified physical tyre-set identity |
+| Native telemetry | Connections reads/plots/downloads a **single driver/lap** from `f1_telemetry` | Not published implicitly |
+| Sprint points, Q1/Q2/Q3, result elapsed times/lap totals, speed traps, pit-transit timings, race-control messages | **Explicit public supplements**, because the five-table event schema doesn't include all of these | Not attributed to Hopsworks |
 | Historical timing replay | **Separate public replay**. Native event laps lack synchronized start/end timestamps | Unchanged |
-| Original 3D Ghost Lap / Pitwall / Pace Detective / Driver DNA | **Separate frozen public Dutch GP experiments**; not silently re-imported or retrained | Their original local pipelines remain local |
-| Track DNA | Descriptive summaries calculated from available native races + labeled public fields | Does not implicitly require/publish every season-wide feature batch |
+| Original 3D Ghost Lap / Pitwall / Pace Detective / Driver DNA | **Separate frozen public Dutch GP experiments**; never re-imported or retrained behind the scenes | Their original local pipelines remain local |
+| Track DNA | Descriptive summaries calculated from available native races + labeled public fields | Does not require or publish a batch for every race in the season |
 
-The original `scripts/publish_cloud.py` is still available for the **original four lab feature groups**. It is not the dashboard runtime switch. In particular, its Elastic publisher expects your **own writable destination**, never the organizer's read-only event source. The new `scripts/connect_cloud.py` handles the dashboard connection/pace workflow.
+`scripts/publish_cloud.py` publishes the **original four lab feature groups** to Hopsworks. It does not switch the dashboard runtime. The dashboard's connection and pace workflow runs through `scripts/connect_cloud.py`.
 
-Cloud schema JSON exports use native fields without adding public supplemental fields. Native full-session telemetry export is intentionally empty with instructions to use the bounded Connections slice. The Race CSV/analytical views include source/supplement notes.
+In cloud mode, schema JSON exports contain only native fields, with no public supplements added. The full-session native telemetry export is deliberately empty and points you to the bounded Connections slice instead. The Race CSV and analytical views include source and supplement notes.
 
-## Source configuration and permissions
+## Source tables and permissions
 
-### Elastic
+### Event table schema
 
-Default aliases are configurable independently:
+| Table | Required features (type) | Other features read when present |
+|---|---|---|
+| `f1_sessions` | season, round_number (numeric); session_name, event_name (string); session_date (timestamp/date/string) | country, location |
+| `f1_results` | season, round_number, position, points (numeric); session_name, driver_code, status (string) | event_name, driver_number, full_name, team_name, grid_position, fastest_lap_ms |
+| `f1_laps` | season, round_number, lap_number, lap_duration_ms (numeric); session_name, driver_code (string); is_pit_in_lap, is_pit_out_lap (boolean) | event_name, team_name, duration_sector_1..3, compound, tyre_life, track_status, position |
+| `f1_weather` | season, round_number, session_time_s (numeric); session_name (string) | event_name, air_temperature, track_temperature, humidity, pressure, wind_speed, wind_direction, rainfall |
+| `f1_telemetry` | season, round_number, lap_number, session_time_s, speed (numeric); session_name, driver_code (string) | event_name, team_name, rpm, throttle, brake, drs, n_gear, x, y, z |
 
-```dotenv
-ELASTIC_INDEX_SESSIONS=f1-sessions
-ELASTIC_INDEX_RESULTS=f1-results
-ELASTIC_INDEX_LAPS=f1-laps
-ELASTIC_INDEX_WEATHER=f1-weather
-ELASTIC_INDEX_TELEMETRY=f1-telemetry
-```
+Lap and sector durations must already be in **milliseconds**, and relative telemetry/weather times in **seconds**. Pit, brake and rainfall fields must be booleans or null, not strings. Optional features that are missing from a table are returned as null. Use explicit, lowercase feature-group names (letters, digits and underscores). Wildcards and paths are rejected.
 
-Use explicit index/alias names, not wildcards or comma-separated multi-index patterns. Expected fields/units are in `docs/DASHBOARD-GUIDE.md` and the organizer's participant guide. Keyword fields and `text` fields with a compatible `.keyword` subfield are supported for filters. Lap/sector durations must already be **milliseconds**, relative telemetry/weather time **seconds**, and pit/brake/rainfall fields booleans/null—not strings.
-
-The source reader uses `_field_caps`, `_count`, point-in-time search with `search_after`, and PIT cleanup. Required source permissions normally include **read** and **view_index_metadata** on the five indices. PIT open/close manages a temporary search context, **not source-document creation/deletion**. There are no `_bulk`, `_reindex`, update or source-document delete calls in this adapter. Cluster configuration/proxy restrictions may require the organizer to permit PIT operations.
-
-Canonical `ELASTIC_SOURCE_URL/API_KEY` take priority. If you want the organizer's variables instead, **remove** the two canonical entries rather than leaving them blank:
-
-```dotenv
-CLUSTER=remote
-REMOTE_ELASTICSEARCH_URL=https://source-endpoint
-REMOTE_ELASTICSEARCH_API_KEY=encoded-readonly-key
-```
-
-With `CLUSTER` unset or `local`, legacy `ELASTICSEARCH_URL/API_KEY` are accepted. Empty canonical values deliberately prevent accidental fallback to an unrelated writable destination. `.env` values are overridden by actual process environment variables. Variable interpolation inside `.env` is disabled.
-
-TLS verification stays enabled. Public HTTPS endpoints normally need no extra configuration. For a self-managed/private CA, set `ELASTIC_CA_CERT` to a trusted certificate file. Plain HTTP is accepted only for loopback development. URLs with embedded credentials, query strings or fragments are rejected. Redirects are not followed with an API key.
+The reader calls `get_feature_group(name, version)`, inspects `features` for the schema, and reads with `select([...]).filter(...).read()`. The filter always includes `season in (2023, 2024)` plus the selected season/round/session (and driver/lap for telemetry), so filtering happens in Hopsworks rather than after a full download. The reader never inserts into, alters or deletes the source tables.
 
 ### Hopsworks
 
-Use your project name, host and API key. `HOPSWORKS_HOST` accepts a hostname and optional port, not `https://.../path`. The adapter enables hostname verification and keeps SDK certificate material under `.cache/hopsworks-certs`. A private CA can be supplied through `HOPSWORKS_CA_CERT`.
+`HOPSWORKS_HOST` accepts a hostname with an optional port, not `https://.../path`. The adapter logs in with `engine='python'` and enables hostname verification. SDK certificate material is kept under `.cache/hopsworks-certs`. You can supply a private CA through `HOPSWORKS_CA_CERT`. The source reader and the pace feature store share a single login.
 
-Your project role/API key must allow feature-store access, group creation/update for the explicit write step, and offline-data reads. Successful login does **not** establish storage/Flight/Kafka/Spark-job connectivity; verify the actual publish/read-back workflow. Some accounts/networks need additional provider configuration that cannot be established without credentials.
+Your project role/API key needs: read access to the event tables, offline-data reads (Arrow Flight / query service), and, for the explicit write steps only, permission to create and update feature groups. A successful login does **not** prove that storage, Flight or job connectivity works, so verify the actual read and publish/read-back workflow.
 
-The destination is `<PITLANE_FEATURE_PREFIX>_race_pace`, version `PITLANE_FEATURE_VERSION`, primary key `id`, with online serving disabled. Columns include `batch_id`, `source_id`, original row identity, season/round/driver, sample count, median/mean/spread, cutoff/filter state, and the canonical row payload. Batch-filtered reads avoid loading the full feature group. Writes use stable IDs; no delete operations are performed. If a group has an incompatible schema, choose a new version or prefix rather than destructively replacing it.
+The pace destination is `<PITLANE_FEATURE_PREFIX>_race_pace`, version `PITLANE_FEATURE_VERSION`, with primary key `id` and online serving disabled. Its columns include `batch_id`, `source_id`, the original row identity, season/round/driver, sample count, median/mean/spread, cutoff/filter state and the canonical row payload. Reads are filtered by batch, so the full feature group is never loaded. Writes use stable IDs, and nothing is ever deleted. If a group has an incompatible schema, choose a new version or prefix instead of replacing it destructively. The prefix may not reuse a source table name.
 
 ## Bounds, caching and failures
 
@@ -155,53 +169,57 @@ Defaults in `.env.example`:
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `PITLANE_REQUEST_TIMEOUT` | 20 s | Per Elastic request; connection timeout is also bounded |
-| `PITLANE_PAGE_SIZE` | 500 | Search page size, maximum 1,000 |
 | `PITLANE_METADATA_LIMIT` | 5,000 | Sessions/results read cap |
 | `PITLANE_LAP_LIMIT` | 5,000 | Native lap rows per selected session |
 | `PITLANE_WEATHER_LIMIT` | 2,000 | Weather rows per selected session |
 | `PITLANE_TELEMETRY_LIMIT` | 20,000 | Telemetry rows per one driver/lap slice |
 | `PITLANE_CACHE_SECONDS` | 300 | Bounded raw/feature in-process cache TTL |
 
-A cap breach, partial shard response, timeout, stalled pagination, conflicting duplicate key, invalid unit/type, missing group, mismatched feature value or authorization failure produces an actionable error. The adapter does **not** silently truncate a slice, fabricate missing values or fall back to the public data. Provider response bodies/SDK exceptions are not echoed because they may contain secrets.
+The following produce an actionable error: a cap breach, a missing table or incompatible schema, a conflicting duplicate key, an invalid unit or type, a mismatched feature value, an authorization failure, or a failed SDK read. The adapter never truncates a slice silently, fabricates missing values or falls back to public data. Hopsworks SDK exceptions are never echoed, because they can contain secrets.
 
-Metadata is a connection snapshot; reload/restart to discover newly indexed sessions/results. Missing event rounds are not filled with public Race results. Championship plots cover the available native events plus labeled Sprint supplements, not a falsely complete event-cluster season.
+Session/result metadata is a snapshot taken when connecting. Reload or restart to pick up newly loaded sessions/results. Missing event rounds are not filled in with public Race results. Championship plots cover the available native events plus the labeled Sprint supplements, so they never claim a complete season the tables don't contain.
 
 ## CLI alternative
 
-All commands read server `.env`/environment; none accept provider keys on the command line.
+All commands read the server `.env`/environment. None of them accept the API key on the command line.
 
 ```bash
-# Read-only mapping/count and feature-store access checks:
-python scripts/connect_cloud.py check --provider elastic
-python scripts/connect_cloud.py check --provider hopsworks
+# Read-only schema/count and feature-store access checks:
+python scripts/connect_cloud.py check --provider source
+python scripts/connect_cloud.py check --provider features
 
 # Explicit source choice, no remote writes:
-python scripts/connect_cloud.py plan --data-source elastic --season 2024 --round 15
-python scripts/connect_cloud.py publish --data-source elastic --season 2024 --round 15
+python scripts/connect_cloud.py plan --data-source hopsworks --season 2024 --round 15
+python scripts/connect_cloud.py publish --data-source hopsworks --season 2024 --round 15
 
 # Actual write: requires the configured write flag, unique prefix and confirmation:
-python scripts/connect_cloud.py publish --data-source elastic --season 2024 --round 15 \
+python scripts/connect_cloud.py publish --data-source hopsworks --season 2024 --round 15 \
   --write --confirm-group pitlane_unique_team_race_pace
 ```
 
-Use `--cutoff 1.10` or `--all-laps` for another filter configuration. Planning reports the active source so you do not accidentally publish a public-data batch while expecting an Elastic-derived one. CLI commands do not change a running web server's modes.
+Use `--cutoff 1.10` or `--all-laps` for another filter configuration. The plan reports which data source is active, so you won't publish a batch computed from local public data when you meant the Hopsworks event tables. CLI commands do not change the modes of a running web server.
 
 ## Security and packaging
 
-- Provider keys are only in the server environment/private `.env`, never browser storage, compiled JavaScript or a form on Connections.
-- The operator token is separate. The browser receives a signed, eight-hour, HttpOnly, SameSite=Strict session cookie; it is Secure on HTTPS. Cloud dashboard data and all provider actions require authorization. Cross-origin connection actions are rejected.
-- Protect any reverse proxy with HTTPS and correct host/proto forwarding. Do not deploy this demo as a public multi-tenant service without additional access controls, rate limits and operational hardening.
-- Package generation excludes `.env*` except the example, caches, SDK credential directories, common certificate/keystore files and live publishing reports. Native responses are cached only in memory; disposable SQLite caches and SDK certificates live under `.cache`.
-- Do not paste credentials into chat. Review your deployment's files and SDK output before public distribution; software cannot recognize every arbitrary filename someone might use for a secret.
-- No cloud infrastructure is automatically provisioned, no reindex of the 57M-row corpus occurs, and no provider charges/writes were incurred while developing/testing this layer.
+- The Hopsworks API key exists only in the server environment or the private `.env`. It never appears in browser storage, compiled JavaScript or any form on Connections.
+- The operator token is separate. The browser receives a signed, eight-hour, HttpOnly, SameSite=Strict session cookie, which is also Secure on HTTPS. Cloud dashboard data and all provider actions require this authorization. Cross-origin connection actions are rejected.
+- Protect any reverse proxy with HTTPS and correct host/proto forwarding. Don't deploy this demo as a public multi-tenant service without additional access controls, rate limits and operational hardening.
+- Package generation excludes all `.env*` files except the example, plus caches, SDK credential directories, common certificate/keystore files and live publishing reports. Native responses are cached only in memory. Disposable SQLite caches and SDK certificates live under `.cache`.
+- Don't paste credentials into chat. Review your deployment's files and SDK output before distributing it publicly; software can't recognize every arbitrary filename someone might use for a secret.
 
 ## Verification boundary
 
-The delivery includes offline tests of the actual HTTP request construction/pagination, native schema adaptation, SDK calls and read-back validation, operator authentication, protected source switching, browser interactions and failure recovery. The dedicated QA fixture server is clearly marked **offline fixture** and uses in-memory doubles, not an Elastic or Hopsworks account. The regular app never activates that server or those fixtures.
+The delivery includes offline tests that cover:
 
-Your final acceptance check, once credentials arrive: **test both providers → activate native Elastic → publish and verify one isolated Hopsworks batch → activate Hopsworks → confirm a real dashboard response reports Hopsworks with matching read-back evidence**. Only after that should you call the deployment live-account validated.
+- the actual SDK call sequence (login, `get_feature_group`, schema inspection, filtered `select().filter().read()`, inserts and read-back)
+- native schema adaptation
+- operator authentication and protected source switching
+- browser interactions and failure recovery
+
+The dedicated QA fixture server is clearly marked **offline fixture** and uses in-memory SDK doubles, not a Hopsworks account. The regular app never activates that server or those fixtures.
+
+Final acceptance check against your project: **test the event tables → test the feature store → activate Hopsworks data → publish and verify one isolated pace batch → activate Hopsworks features → confirm a real dashboard response reports Hopsworks with matching read-back evidence**. Don't call the deployment live-account validated until all of these pass.
 
 ## Version 2.2 / public replay remains independent
 
-Ghost Lap additionally includes a bundled synchronized **20-driver 2024 Dutch GP** archive (218,520 recorded XY / 110,300 car-telemetry records). It works without provider credentials and is distinct from native Elastic telemetry and Hopsworks pace batches. New `/api/replay/*` routes serve only this public snapshot, not private cloud data. The original A/B comparison is still available as “Two-car detail.” See [MULTI-CAR-REPLAY.md](MULTI-CAR-REPLAY.md).
+Ghost Lap also includes a bundled synchronized **20-driver 2024 Dutch GP** archive (218,520 recorded XY / 110,300 car-telemetry records). It works without provider credentials and is separate from the native Hopsworks telemetry table and the pace batches. The `/api/replay/*` routes serve only this public snapshot, never private cloud data. The original A/B comparison is still available as "Two-car detail." See [MULTI-CAR-REPLAY.md](MULTI-CAR-REPLAY.md).

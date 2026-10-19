@@ -1,12 +1,12 @@
-"""Bounded, read-only Elastic adapter and explicit-write Hopsworks feature store.
+"""Bounded, read-only Hopsworks source reader and explicit-write pace feature store.
 
-No raw HTTP/SDK exception is sent to clients: provider errors can echo credentials.
-PIT creation/cleanup changes only a temporary search context, never source data.
+Both use one server-side Hopsworks login. No raw SDK exception is sent to
+clients: provider errors can echo credentials. Source reads never insert into,
+alter or delete the configured event feature groups.
 """
 import hashlib, json, math, threading, time
-from urllib.parse import quote
+from datetime import date,datetime
 import pandas as pd
-import requests
 from .settings import ConnectionProblem, problem, KINDS,ROOT
 
 COMMON=['season','round_number','event_name','session_name']
@@ -16,124 +16,120 @@ FIELDS={
  'laps':COMMON+['driver_code','team_name','lap_number','lap_duration_ms','duration_sector_1','duration_sector_2','duration_sector_3','compound','tyre_life','is_pit_out_lap','is_pit_in_lap','track_status','position'],
  'weather':COMMON+['session_time_s','air_temperature','track_temperature','humidity','pressure','wind_speed','wind_direction','rainfall'],
  'telemetry':COMMON+['driver_code','team_name','lap_number','session_time_s','speed','rpm','throttle','brake','drs','n_gear','x','y','z']}
-NUMERIC={'byte','short','integer','long','float','double','half_float','scaled_float','unsigned_long'}
-TEXT={'keyword','constant_keyword','wildcard'}
+INTEGER={'tinyint','smallint','int','integer','bigint'}
+NUMERIC=INTEGER|{'float','double','decimal'}
+TEXT={'string','varchar','char'}
 REQUIRED={
- 'sessions':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'event_name':TEXT,'session_date':{'date','date_nanos','keyword'}},
+ 'sessions':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'event_name':TEXT,'session_date':{'timestamp','date','string'}},
  'results':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'driver_code':TEXT,'position':NUMERIC,'points':NUMERIC,'status':TEXT},
  'laps':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'driver_code':TEXT,'lap_number':NUMERIC,'lap_duration_ms':NUMERIC,'is_pit_in_lap':{'boolean'},'is_pit_out_lap':{'boolean'}},
  'weather':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'session_time_s':NUMERIC},
  'telemetry':{'season':NUMERIC,'round_number':NUMERIC,'session_name':TEXT,'driver_code':TEXT,'lap_number':NUMERIC,'session_time_s':NUMERIC,'speed':NUMERIC}}
+FILTERS={'season','round_number','session_name','driver_code','lap_number'}
 
 def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
 def digest(value):return hashlib.sha256(canonical(value).encode()).hexdigest()
+def base_type(value):return str(value or '').lower().split('(')[0].split('<')[0].strip()
 
-class ElasticReader:
-    def __init__(self,settings,session=None):
-        if not settings.elastic_ready:problem('not_configured','Set the Elastic source URL and API key in the server environment, then reload configuration.')
-        self.settings=settings;self.session=session or requests.Session();self.session.trust_env=False
-        self.session.headers.update({'Authorization':'ApiKey '+settings.elastic_key,'Content-Type':'application/json'})
-        self.lock=threading.RLock();self.caps={};self.cache={};self.counts={};self.last_read=None
-    def request(self,method,path,body=None,params=None):
-        # Fixed paths are constructed internally, never from browser input.
-        try:
-            r=self.session.request(method,self.settings.elastic_url+path,json=body,params=params,timeout=(5,self.settings.timeout),verify=self.settings.elastic_ca or True,allow_redirects=False)
-        except requests.Timeout:problem('timeout','Elastic request timed out. Check connectivity or retry a smaller slice.')
-        except requests.RequestException:problem('unreachable','Cannot reach Elastic. Check the source URL, network and CA certificate; TLS verification remains enabled.')
-        if r.status_code in (401,403):problem('authentication' if r.status_code==401 else 'permission','Elastic rejected access. Check the API key and read/view_index_metadata permissions on the configured source indices.')
-        if r.status_code==404:problem('missing_index','An Elastic source index or search context is unavailable. Check index aliases and retry.')
-        if r.status_code==429:problem('rate_limit','Elastic is rate-limiting requests. Wait, then retry.')
-        if not 200<=r.status_code<300:problem('provider_error','Elastic rejected the request. Check deployment compatibility and server-side permissions; source data was not written.')
-        try:return r.json()
-        except ValueError:problem('invalid_response','Elastic returned an invalid JSON response.')
-    def mapping(self,kind):
-        if kind not in FIELDS:problem('invalid_index','Unsupported event index.',422)
-        if kind in self.caps:return self.caps[kind]
-        fields=self.request('POST','/'+quote(self.settings.indexes[kind],safe='')+'/_field_caps',params={'fields':','.join(FIELDS[kind]+[x+'.keyword' for x in REQUIRED[kind]])}).get('fields',{})
-        lookup={};missing=[]
-        for name,allowed in REQUIRED[kind].items():
-            selected=name
-            types=set(fields.get(name,{}))
-            if not types.intersection(allowed) and set(fields.get(name+'.keyword',{})).intersection(allowed):selected=name+'.keyword';types=set(fields[selected])
-            if not types or not types.issubset(allowed):missing.append(name)
-            lookup[name]=selected
-        if missing:problem('schema_mismatch',f'{kind} mapping has missing/incompatible fields: '+', '.join(missing)+'. Verify the event schema and units.')
-        self.caps[kind]=lookup;return lookup
-    def query(self,kind,filters):
-        fields=self.mapping(kind);terms=[{'terms':{fields.get('season','season'):[2023,2024]}}]
+def plain(value,typ=None):
+    """pandas/numpy cell -> JSON value; nulls stay null, integral columns stay integers."""
+    if value is None or value is pd.NA or value is pd.NaT:return None
+    if isinstance(value,(list,dict,tuple)):return value
+    if isinstance(value,(pd.Timestamp,datetime,date)):return value.isoformat()
+    if hasattr(value,'item'):value=value.item()
+    if isinstance(value,float):
+        if math.isnan(value):return None
+        if typ in INTEGER and value.is_integer():return int(value)
+    return value
+
+class HopsConnection:
+    """One authenticated feature-store handle shared by source reads and pace features."""
+    def __init__(self,settings,client=None):
+        self.settings=settings;self.client=client;self.store=None;self.lock=threading.RLock()
+    def connect(self):
+        with self.lock:
+            if self.store is not None:return self.store
+            if not self.settings.hops_ready:problem('not_configured','Set HOPSWORKS_HOST, HOPSWORKS_PROJECT and HOPSWORKS_API_KEY server-side, then reload configuration.')
+            try:
+                if self.client is None:
+                    import hopsworks
+                    self.client=hopsworks
+                host=self.settings.hops_host;port=443
+                if ':' in host:host,port=host.rsplit(':',1);port=int(port)
+                certs=ROOT/'.cache/hopsworks-certs';certs.mkdir(parents=True,exist_ok=True)
+                project=self.client.login(host=host,port=port,project=self.settings.hops_project,api_key_value=self.settings.hops_key,hostname_verification=True,trust_store_path=self.settings.hops_ca or None,cert_folder=str(certs),engine='python')
+                self.store=project.get_feature_store();return self.store
+            except ImportError:problem('sdk_missing','Install requirements-integrations.txt in the server Python environment before connecting Hopsworks.')
+            except Exception:problem('hopsworks_connection','Hopsworks connection failed. Check host/project/key, SDK/server compatibility and feature-store permissions.')
+
+def connection(settings,client):return client if isinstance(client,HopsConnection) else HopsConnection(settings,client)
+
+class HopsSource:
+    """Bounded reads of the event feature groups (f1_sessions, f1_results, ...)."""
+    def __init__(self,settings,client=None):
+        if not settings.hops_ready:problem('not_configured','Set HOPSWORKS_HOST, HOPSWORKS_PROJECT and HOPSWORKS_API_KEY in the server environment, then reload configuration.')
+        self.settings=settings;self.connection=connection(settings,client)
+        self.lock=threading.RLock();self.groups={};self.types={};self.cache={};self.counts={};self.last_read=None
+    def group(self,kind):
+        if kind not in FIELDS:problem('invalid_source','Unsupported event feature group.',422)
+        if kind in self.groups:return self.groups[kind]
+        store=self.connection.connect();name=self.settings.sources[kind]
+        try:fg=store.get_feature_group(name=name,version=self.settings.source_version)
+        except Exception:fg=None
+        if fg is None:problem('missing_source',f'Hopsworks feature group {name} v{self.settings.source_version} is unavailable. Load the event data (scripts/connect_cloud.py load-source) or check read permission.')
+        try:types={f.name:base_type(f.type) for f in fg.features}
+        except Exception:problem('invalid_response',f'Hopsworks did not return a schema for {name}.')
+        missing=[k for k,allowed in REQUIRED[kind].items() if types.get(k) not in allowed]
+        if missing:problem('schema_mismatch',f'{kind} feature group has missing/incompatible features: '+', '.join(missing)+'. Verify the event schema and units.')
+        self.groups[kind]=fg;self.types[kind]=types;return fg
+    def predicate(self,fg,filters):
+        condition=fg['season'].isin([2023,2024])
         for k,v in filters.items():
-            if k not in {'season','round_number','session_name','driver_code','lap_number'}:problem('invalid_filter','Only bounded event/driver/lap filters are supported.',422)
-            terms.append({'term':{fields.get(k,k):v}})
-        return {'bool':{'filter':terms}}
+            if k not in FILTERS:problem('invalid_filter','Only bounded event/driver/lap filters are supported.',422)
+            condition=condition&(fg[k]==v)
+        return condition
+    def fetch(self,kind,filters,columns):
+        fg=self.group(kind)
+        try:frame=fg.select(columns).filter(self.predicate(fg,filters)).read()
+        except ConnectionProblem:raise
+        except Exception:problem('source_read','Hopsworks source read failed. Check offline storage/Arrow Flight access and SDK/server compatibility; no partial dataset was activated.')
+        if frame is None:return pd.DataFrame(columns=columns)
+        if not isinstance(frame,pd.DataFrame):problem('invalid_response','Hopsworks returned an unexpected dataframe type.')
+        return frame
     def inspect(self):
         result=[]
         with self.lock:
             for kind in KINDS:
                 try:
-                    query=self.query(kind,{})
-                    value=self.request('POST','/'+quote(self.settings.indexes[kind],safe='')+'/_count',{'query':query})
-                    if value.get('_shards',{}).get('failed',0):problem('partial_search','Elastic returned incomplete shard results; partial counts are not accepted.')
-                    count=int(value['count']);self.counts[kind]=count
-                    result.append({'kind':kind,'ok':True,'count':count})
-                except ConnectionProblem as e:result.append({'kind':kind,'ok':False,'error':e.public()})
-        return {'ok':all(r['ok'] for r in result),'dashboard_ready':all(r['ok'] for r in result if r['kind']!='telemetry'),'indexes':result,'read_only':True}
+                    self.group(kind)
+                    # Never count the full telemetry corpus; its schema check is the readiness signal.
+                    count=None if kind=='telemetry' else len(self.fetch(kind,{},['season']))
+                    if count is not None:self.counts[kind]=count
+                    result.append({'kind':kind,'name':self.settings.sources[kind],'ok':True,'count':count})
+                except ConnectionProblem as e:result.append({'kind':kind,'name':self.settings.sources[kind],'ok':False,'error':e.public()})
+        return {'ok':all(r['ok'] for r in result),'dashboard_ready':all(r['ok'] for r in result if r['kind']!='telemetry'),'groups':result,'version':self.settings.source_version,'read_only':True}
     def read(self,kind,filters,limit=None,fresh=False):
-        if kind not in FIELDS:problem('invalid_index','Unsupported event index.',422)
-        if kind=='telemetry' and not {'season','round_number','session_name','driver_code','lap_number'}.issubset(filters):problem('unbounded_telemetry','Telemetry requires a season, round, session, driver and lap.',422)
+        if kind not in FIELDS:problem('invalid_source','Unsupported event feature group.',422)
+        if kind=='telemetry' and not FILTERS.issubset(filters):problem('unbounded_telemetry','Telemetry requires a season, round, session, driver and lap.',422)
         default=self.settings.metadata_limit if kind in {'sessions','results'} else self.settings.lap_limit if kind=='laps' else self.settings.weather_limit if kind=='weather' else self.settings.telemetry_limit
         limit=min(default,limit or default);key=canonical([kind,filters,limit])
         with self.lock:
             if not fresh and key in self.cache and time.monotonic()-self.cache[key][0]<self.settings.cache_seconds:return json.loads(self.cache[key][1])
-            query=self.query(kind,filters);pit=None;rows=[];after=None;total=None;deadline=time.monotonic()+max(60,self.settings.timeout*3)
-            try:
-                pit=self.request('POST','/'+quote(self.settings.indexes[kind],safe='')+'/_pit',params={'keep_alive':'1m'}).get('id')
-                if not pit:problem('invalid_response','Elastic did not return a point-in-time search context.')
-                while True:
-                    if time.monotonic()>deadline:problem('timeout','The bounded Elastic read exceeded its time budget. Retry the selected slice.')
-                    body={'pit':{'id':pit,'keep_alive':'1m'},'query':query,'size':min(self.settings.page_size,limit+1-len(rows)),'sort':[{'_shard_doc':'asc'}],'track_total_hits':True,'_source':FIELDS[kind]}
-                    if after is not None:body['search_after']=after
-                    data=self.request('POST','/_search',body);pit=data.get('pit_id',pit)
-                    if data.get('timed_out') or data.get('_shards',{}).get('failed',0):problem('partial_search','Elastic returned a partial/timed-out search. No partial dataset was activated.')
-                    hits=data.get('hits',{});count=hits.get('total',{})
-                    if not isinstance(count,dict) or count.get('relation')!='eq':problem('invalid_response','Exact Elastic result counts are required for bounded reads.')
-                    if total is None:total=count['value']
-                    if total>limit:problem('slice_limit',f'The {kind} slice exceeds the configured {limit:,}-row cap. Narrow the selection or explicitly raise the server-side cap.',413)
-                    page=hits.get('hits',[])
-                    if not page:break
-                    for h in page:
-                        if not isinstance(h.get('_source'),dict):problem('invalid_response','Source documents must be available in the configured Elastic indices.')
-                        rows.append(h['_source'])
-                    next_after=page[-1].get('sort')
-                    if next_after is None or next_after==after:problem('invalid_response','Elastic pagination did not advance safely.')
-                    after=next_after
-                    if len(rows)>=total:break
-                if len(rows)!=total:problem('partial_search','Elastic result count changed or pagination was incomplete. Retry; no partial dataset was activated.')
-                if len(self.cache)>=128:self.cache.pop(next(iter(self.cache)))
-                self.cache[key]=(time.monotonic(),canonical(rows));self.last_read={'kind':kind,'rows':len(rows),'scope':dict(filters)}
-                return rows
-            finally:
-                if pit:
-                    try:self.request('DELETE','/_pit',{'id':pit})
-                    except ConnectionProblem:pass # PIT expires after one minute even if cleanup is unavailable.
+            self.group(kind);types=self.types[kind];columns=[f for f in FIELDS[kind] if f in types]
+            frame=self.fetch(kind,filters,columns)
+            if len(frame)>limit:problem('slice_limit',f'The {kind} slice exceeds the configured {limit:,}-row cap. Narrow the selection or explicitly raise the server-side cap.',413)
+            rows=[{f:plain(r.get(f),types.get(f)) for f in FIELDS[kind]} for r in frame.to_dict('records')]
+            if len(self.cache)>=128:self.cache.pop(next(iter(self.cache)))
+            self.cache[key]=(time.monotonic(),canonical(rows));self.last_read={'kind':kind,'rows':len(rows),'scope':dict(filters),'feature_group':self.settings.sources[kind]}
+            return rows
 
 class HopsFeatures:
     """Dashboard pace batches only. GET/read never creates or inserts a group."""
     def __init__(self,settings,client=None):
-        self.settings=settings;self.client=client;self.store=None;self.lock=threading.RLock();self.cache={};self.last_read=None
+        self.settings=settings;self.connection=connection(settings,client);self.store=None;self.lock=threading.RLock();self.cache={};self.last_read=None
     def connect(self):
-        if self.store is not None:return self.store
-        if not self.settings.hops_ready:problem('not_configured','Set HOPSWORKS_HOST, HOPSWORKS_PROJECT and HOPSWORKS_API_KEY server-side, then reload configuration.')
-        try:
-            if self.client is None:
-                import hopsworks
-                self.client=hopsworks
-            host=self.settings.hops_host;port=443
-            if ':' in host:host,port=host.rsplit(':',1);port=int(port)
-            certs=ROOT/'.cache/hopsworks-certs';certs.mkdir(parents=True,exist_ok=True)
-            project=self.client.login(host=host,port=port,project=self.settings.hops_project,api_key_value=self.settings.hops_key,hostname_verification=True,trust_store_path=self.settings.hops_ca or None,cert_folder=str(certs),engine='python')
-            self.store=project.get_feature_store();return self.store
-        except ImportError:problem('sdk_missing','Install requirements-integrations.txt in the server Python environment before connecting Hopsworks.')
-        except Exception:problem('hopsworks_connection','Hopsworks connection failed. Check host/project/key, SDK/server compatibility and feature-store permissions.')
+        if self.store is None:self.store=self.connection.connect()
+        return self.store
     def inspect(self):
         with self.lock:self.connect()
         return {'ok':True,'feature_group':self.settings.group_name,'version':self.settings.feature_version,'write_performed':False,'note':'Authenticated feature-store access; this does not prove ingestion or offline-data read permission.'}

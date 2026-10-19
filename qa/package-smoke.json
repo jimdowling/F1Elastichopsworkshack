@@ -1,7 +1,7 @@
 {
   "passed": true,
   "app_version": "2.2.0",
-  "tested_at": "2026-10-19T15:09:22.226346+00:00",
+  "tested_at": "2026-10-19T22:00:25.113998+00:00",
   "checks": [
     "ZIP integrity",
     "Safe rooted paths and no symlink members",
@@ -35,7 +35,7 @@
   ],
   "scope": "Fresh extraction with installed Python dependencies; no clean-OS or live cloud claim.",
   "repack_note": "The final repack includes this report. --verify-only repeats all checks without modifying it.",
-  "archive_files": 298,
+  "archive_files": 270,
   "extraction": {
     "statuses": {
       "/": 200,
@@ -61,13 +61,13 @@
       "/api/download/brief": 200
     },
     "assets": [
-      "/assets/index-W85G0DDx.js",
+      "/assets/index-BmnVonII.js",
       "/assets/index-C7_ugdbH.css",
-      "/assets/Dashboard-CgSE9XdG.js",
-      "/assets/TelemetryScene-Bg3YekJb.js",
-      "/assets/GhostWorkspace-BH7njEIk.js",
-      "/assets/FleetScene-D9ubPOND.js",
-      "/assets/sceneGeometry-D_5djBqy.js"
+      "/assets/Dashboard-ie1a53zh.js",
+      "/assets/TelemetryScene-CWwnYwEt.js",
+      "/assets/GhostWorkspace-FZCEJImx.js",
+      "/assets/FleetScene-C3oQ2Z52.js",
+      "/assets/sceneGeometry-DcyieLZ6.js"
     ],
     "schema_counts": {
       "f1-sessions": 1,
@@ -99,7 +99,7 @@
       "telemetry_samples": 110300,
       "all_driver_files_verified": true
     },
-    "on_demand_zip_bytes": 17929646,
+    "on_demand_zip_bytes": 16735349,
     "ghost_rpm_points": 361,
     "classified_actual_gap": -22.896
   },

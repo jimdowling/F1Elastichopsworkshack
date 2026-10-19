@@ -40,7 +40,7 @@ The imported race interval contains:
 
 Recorded common coverage is approximately **00:03:09.315–01:35:06.816** on the provider’s session clock, whose origin is **2024-08-25 13:00:00 UTC**. This is **not certified elapsed time from lights-out**. The initial view is paused at **00:13:09.315**, showing the field around lap eight. At that timestamp the recorded rank feed has VER ahead of NOR; it is not reusing the ghost-lap order.
 
-The replay works **now, offline after installation, without Elastic/Hopsworks credentials**. It uses a deliberately separate public archive; it does not claim your private event telemetry is connected.
+The replay works **now, offline after installation, without Hopsworks credentials**. It uses a deliberately separate public archive; it does not claim your private event telemetry is connected.
 
 ### Two-car detail
 

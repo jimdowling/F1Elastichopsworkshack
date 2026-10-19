@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-19T14:43:47.328Z",
+  "run_at": "2026-10-19T21:51:43.339Z",
   "checks": [
     {
       "name": "NOR/VER: both paths pass through all 361 measured XY samples",
@@ -204,7 +204,7 @@
     {
       "pair": "NOR/LEC",
       "max_sample_error_m": 4.577060545493686e-13,
-      "max_b_distance_from_reference_line_m": 1.8453133698278477,
+      "max_b_distance_from_reference_line_m": 1.845313369827822,
       "spline_length_m": 4249.395800932452
     },
     {
@@ -233,7 +233,7 @@
     },
     {
       "pair": "LEC/NOR",
-      "max_sample_error_m": 4.2891661525952447e-13,
+      "max_sample_error_m": 4.2901500085958017e-13,
       "max_b_distance_from_reference_line_m": 1.9201368697086154,
       "spline_length_m": 4257.840171534895
     },
@@ -252,20 +252,20 @@
     {
       "pair": "PIA/NOR",
       "max_sample_error_m": 5.727212210020344e-13,
-      "max_b_distance_from_reference_line_m": 1.907549049158339,
-      "spline_length_m": 4254.633923112316
+      "max_b_distance_from_reference_line_m": 1.9075490491604319,
+      "spline_length_m": 4254.633923112317
     },
     {
       "pair": "PIA/VER",
       "max_sample_error_m": 4.046040225349525e-13,
-      "max_b_distance_from_reference_line_m": 1.8080252759069322,
-      "spline_length_m": 4254.633923112316
+      "max_b_distance_from_reference_line_m": 1.8080252759072533,
+      "spline_length_m": 4254.633923112317
     },
     {
       "pair": "PIA/LEC",
       "max_sample_error_m": 4.121147867408581e-13,
-      "max_b_distance_from_reference_line_m": 2.0653162145376482,
-      "spline_length_m": 4254.633923112316
+      "max_b_distance_from_reference_line_m": 2.065316214536952,
+      "spline_length_m": 4254.633923112317
     }
   ]
 }

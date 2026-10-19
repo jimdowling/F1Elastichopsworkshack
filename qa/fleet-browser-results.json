@@ -1,11 +1,11 @@
 {
-  "created_at": "2026-10-19T14:53:40.747Z",
+  "created_at": "2026-10-19T21:52:48.193Z",
   "passed": 41,
   "total": 41,
-  "duration_ms": 73996,
+  "duration_ms": 64407,
   "measurements": {
     "ghost_playing_audio": {
-      "rms": 0.05872072770396152,
+      "rms": 0.06035524742389691,
       "state": "running",
       "contexts": 1
     },
@@ -15,7 +15,7 @@
       "contexts": 1
     },
     "race_playing_audio": {
-      "rms": 0.04453739585216145,
+      "rms": 0.044288175748207086,
       "state": "running",
       "contexts": 2
     }

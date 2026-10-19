@@ -215,7 +215,7 @@ def test_csv_formula_escape_without_mutating_sources(db):
 def test_schema_export_dimensions_and_coverage(client,index,expected):
     r=client.get(f'/api/dashboard/schema/{index}.json?season=2024&round=15');assert r.status_code==200
     d=r.json();assert d['record_count']==len(d['records'])==expected
-    assert 'not the event cluster' in d['provenance']
+    assert 'not the Hopsworks event tables' in d['provenance']
     for row in d['records']:
         assert row['season']==2024 and row['round_number']==15 and row['event_name']=='Dutch Grand Prix' and row['session_name']=='Race'
         if index=='f1-laps':assert row['track_status'] is None and (row['lap_duration_ms'] is None or isinstance(row['lap_duration_ms'],int))
