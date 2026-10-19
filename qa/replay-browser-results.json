@@ -1,0 +1,262 @@
+{
+  "run_at": "2026-10-19T14:56:46.828Z",
+  "browser": "Chromium / SwiftShader WebGL 2 / native Web Audio",
+  "checks": [
+    {
+      "name": "Three.js scene is lazy-loaded, not requested by Overview",
+      "passed": true
+    },
+    {
+      "name": "Ghost Lap initializes a real WebGL 2 scene",
+      "passed": true
+    },
+    {
+      "name": "3D scene chunk loads on demand",
+      "passed": true
+    },
+    {
+      "name": "Audio does not initialize or autoplay on page load",
+      "passed": true
+    },
+    {
+      "name": "Replay starts paused at lap start with 1× selected",
+      "passed": true
+    },
+    {
+      "name": "Chase B produces a different rendered camera view",
+      "passed": true
+    },
+    {
+      "name": "Orbit drag changes rendered camera position",
+      "passed": true
+    },
+    {
+      "name": "Orbit scroll zoom changes the rendered view",
+      "passed": true
+    },
+    {
+      "name": "Explicit enable creates one running AudioContext but stays silent while paused",
+      "passed": true
+    },
+    {
+      "name": "Real synthesized audio is nonzero and does not clip while playing",
+      "passed": true
+    },
+    {
+      "name": "Both 3D car positions advance during playback",
+      "passed": true
+    },
+    {
+      "name": "Pause silences the actual analyser output",
+      "passed": true
+    },
+    {
+      "name": "Pause holds replay time steady",
+      "passed": true
+    },
+    {
+      "name": "Oscillator follows the recorded high RPM sample",
+      "passed": true
+    },
+    {
+      "name": "Oscillator follows the recorded low RPM sample",
+      "passed": true
+    },
+    {
+      "name": "Recorded RPM changes produce a material pitch change",
+      "passed": true
+    },
+    {
+      "name": "Chase B also foregrounds driver B in the audio mix",
+      "passed": true
+    },
+    {
+      "name": "Zero volume silences output without pausing the replay",
+      "passed": true
+    },
+    {
+      "name": "Raising the volume restores an actual audio signal",
+      "passed": true
+    },
+    {
+      "name": "Mute silences actual audio while the cars continue moving",
+      "passed": true
+    },
+    {
+      "name": "Re-enabling sound reuses the existing context",
+      "passed": true
+    },
+    {
+      "name": "Real gear changes trigger audible shift envelopes and transients",
+      "passed": true
+    },
+    {
+      "name": "4× transport control is selectable",
+      "passed": true
+    },
+    {
+      "name": "Background visibility handler pauses playback and silences audio",
+      "passed": true
+    },
+    {
+      "name": "Lap end clamps both cars at their finish and automatically silences audio",
+      "passed": true
+    },
+    {
+      "name": "Restart returns to exact lap start",
+      "passed": true
+    },
+    {
+      "name": "Immersive mode fills the viewport with live driver instruments",
+      "passed": true
+    },
+    {
+      "name": "Escape closes immersive mode",
+      "passed": true
+    },
+    {
+      "name": "LEC/VER driver change rebuilds a working 3D scene",
+      "passed": true
+    },
+    {
+      "name": "PIA/VER driver change rebuilds a working 3D scene",
+      "passed": true
+    },
+    {
+      "name": "NOR/VER driver change rebuilds a working 3D scene",
+      "passed": true
+    },
+    {
+      "name": "2D fallback preserves timeline and the original map",
+      "passed": true
+    },
+    {
+      "name": "Returning from 2D rebuilds the 3D renderer at the same replay time",
+      "passed": true
+    },
+    {
+      "name": "3D layout fits a 390px phone viewport",
+      "passed": true
+    },
+    {
+      "name": "3D canvas and sound controls remain visible on mobile",
+      "passed": true
+    },
+    {
+      "name": "Mobile immersive view keeps timeline, sound, and instruments within screen",
+      "passed": true
+    },
+    {
+      "name": "A real WebGL context-loss event offers a working 2D recovery",
+      "passed": true
+    },
+    {
+      "name": "Leaving Ghost Lap closes its AudioContext",
+      "passed": true
+    },
+    {
+      "name": "The other experiences remain reachable after disposing the 3D scene",
+      "passed": true
+    },
+    {
+      "name": "WebGL-unavailable browser can open and replay in 2D",
+      "passed": true
+    },
+    {
+      "name": "2D fallback playback works without a WebGL context",
+      "passed": true
+    },
+    {
+      "name": "No external browser assets or services are required",
+      "passed": true
+    },
+    {
+      "name": "No unexpected browser runtime or console errors",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "external_requests": [],
+  "measurements": {
+    "playing": {
+      "contexts": 1,
+      "state": "running",
+      "rms": 0.061544915457048835,
+      "peak": 0.10164700448513031,
+      "frequency": [
+        542.116943359375,
+        180.7056427001953,
+        538.9124755859375,
+        179.6374969482422
+      ],
+      "gains": [
+        0.25200000405311584,
+        0.3400000035762787,
+        0.3400000035762787,
+        0.023109113797545433,
+        0.3400000035762787,
+        0.06800000369548798,
+        0.00458399998024106
+      ],
+      "sources": 2,
+      "shiftRatioMin": 2.9999999999999996,
+      "shiftRatioMax": 3.0000000000000004
+    },
+    "paused": {
+      "contexts": 1,
+      "state": "running",
+      "rms": 0,
+      "peak": 0,
+      "frequency": [
+        544.3508911132812,
+        181.45030212402344,
+        540.7717895507812,
+        180.2572784423828
+      ],
+      "gains": [
+        0,
+        0.3400000035762787,
+        0,
+        0,
+        0.3400000035762787,
+        0,
+        0
+      ],
+      "sources": 2,
+      "shiftRatioMin": 2.9999999999999996,
+      "shiftRatioMax": 3.0000000000000004
+    },
+    "rpm_driven_frequencies_hz": [
+      605.6746215820312,
+      325.27813720703125
+    ],
+    "gear_shifts": {
+      "contexts": 1,
+      "state": "running",
+      "rms": 0.06206798148680935,
+      "peak": 0.0962693840265274,
+      "frequency": [
+        501.67291259765625,
+        183.29519653320312,
+        543.9912719726562,
+        180.6514129638672
+      ],
+      "gains": [
+        0.25200000405311584,
+        0.3400000035762787,
+        0.05476841330528259,
+        0.003226321656256914,
+        0.3400000035762787,
+        0.33995670080184937,
+        0.015684088692069054
+      ],
+      "sources": 6,
+      "shiftRatioMin": 2.5799999999999996,
+      "shiftRatioMax": 3.21
+    },
+    "expected_webgl_unavailable_console": [
+      "THREE.WebGLRenderer: Error creating WebGL context.",
+      "THREE.WebGLRenderer: Error creating WebGL context."
+    ]
+  }
+}

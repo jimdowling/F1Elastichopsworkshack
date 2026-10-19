@@ -1,0 +1,266 @@
+{
+  "created_at": "2026-10-19T15:00:47.717Z",
+  "scope": "Local readiness + in-memory Elastic HTTP / Hopsworks SDK fixtures. No live provider accounts.",
+  "duration_ms": 19458,
+  "passed": 63,
+  "total": 63,
+  "checks": [
+    {
+      "name": "Connections works before credentials or catalog access",
+      "passed": true
+    },
+    {
+      "name": "Default readiness makes no false cloud claim",
+      "passed": true
+    },
+    {
+      "name": "No provider key input exists",
+      "passed": true
+    },
+    {
+      "name": "Unconfigured provider tests and writes are disabled",
+      "passed": true
+    },
+    {
+      "name": "Credential setup guide is a working download",
+      "passed": true
+    },
+    {
+      "name": "Connections has no mobile document overflow",
+      "passed": true
+    },
+    {
+      "name": "Integration QA is visibly labeled as offline fixtures",
+      "passed": true
+    },
+    {
+      "name": "Wrong operator token has a visible safe error",
+      "passed": true
+    },
+    {
+      "name": "Operator session unlocks controls and clears token input",
+      "passed": true
+    },
+    {
+      "name": "Operator token is absent from browser storage and readable cookies",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: test/elastic",
+      "passed": true
+    },
+    {
+      "name": "Job result: test/elastic",
+      "passed": true
+    },
+    {
+      "name": "Elastic readiness shows actual fixture counts",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: test/hopsworks",
+      "passed": true
+    },
+    {
+      "name": "Job result: test/hopsworks",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: modes",
+      "passed": true
+    },
+    {
+      "name": "Job result: modes",
+      "passed": true
+    },
+    {
+      "name": "Actual Elastic-backed fixture values replace public standings",
+      "passed": true
+    },
+    {
+      "name": "Native workbench replaces public-only coverage claims",
+      "passed": true
+    },
+    {
+      "name": "Native schema preview contains source track status",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: modes",
+      "passed": true
+    },
+    {
+      "name": "Job result: modes",
+      "passed": true
+    },
+    {
+      "name": "Missing feature group blocks activation without hiding the failure",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: feature-plan",
+      "passed": true
+    },
+    {
+      "name": "Job result: feature-plan",
+      "passed": true
+    },
+    {
+      "name": "Real feature plan shows twenty rows from active Elastic source",
+      "passed": true
+    },
+    {
+      "name": "Publishing requires typed name confirmation",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: publish",
+      "passed": true
+    },
+    {
+      "name": "Job result: publish",
+      "passed": true
+    },
+    {
+      "name": "Actual fixture write/read-back evidence appears",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: modes",
+      "passed": true
+    },
+    {
+      "name": "Job result: modes",
+      "passed": true
+    },
+    {
+      "name": "Race-pace UI actually declares Hopsworks read-back",
+      "passed": true
+    },
+    {
+      "name": "Hybrid-source boundaries are visible",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Dashboard",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Historical timing",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Race calendar",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Session results",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Driver standings",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Constructor standings",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Drivers & profiles",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Teams",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Driver statistics",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Head to head",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Consistency",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Race pace",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Pit-lane analysis",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Tyres & stints",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Weather & conditions",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Race control",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Track DNA",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Coverage & schema",
+      "passed": true
+    },
+    {
+      "name": "Cloud-fixture route renders: Connections",
+      "passed": true
+    },
+    {
+      "name": "Timing remains a clearly labeled public reference",
+      "passed": true
+    },
+    {
+      "name": "Native telemetry is queried and plotted",
+      "passed": true
+    },
+    {
+      "name": "Bounded native telemetry export works",
+      "passed": true
+    },
+    {
+      "name": "Empty native slice does not substitute a public replay",
+      "passed": true
+    },
+    {
+      "name": "Configured connection controls fit mobile",
+      "passed": true
+    },
+    {
+      "name": "Action accepted: modes",
+      "passed": true
+    },
+    {
+      "name": "Job result: modes",
+      "passed": true
+    },
+    {
+      "name": "Lock clears the operator session and disables actions",
+      "passed": true
+    },
+    {
+      "name": "No unexpected browser errors",
+      "passed": true
+    },
+    {
+      "name": "No external browser requests",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "expected": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "external": []
+}

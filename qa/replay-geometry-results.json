@@ -1,0 +1,271 @@
+{
+  "run_at": "2026-10-19T14:43:47.328Z",
+  "checks": [
+    {
+      "name": "NOR/VER: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "NOR/VER: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "NOR/VER: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "NOR/VER: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "NOR/LEC: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "NOR/LEC: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "NOR/LEC: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "NOR/LEC: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "NOR/PIA: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "NOR/PIA: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "NOR/PIA: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "NOR/PIA: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "VER/NOR: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "VER/NOR: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "VER/NOR: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "VER/NOR: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "VER/LEC: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "VER/LEC: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "VER/LEC: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "VER/LEC: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "VER/PIA: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "VER/PIA: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "VER/PIA: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "VER/PIA: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "LEC/NOR: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "LEC/NOR: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "LEC/NOR: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "LEC/NOR: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "LEC/VER: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "LEC/VER: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "LEC/VER: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "LEC/VER: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "LEC/PIA: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "LEC/PIA: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "LEC/PIA: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "LEC/PIA: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "PIA/NOR: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "PIA/NOR: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "PIA/NOR: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "PIA/NOR: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "PIA/VER: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "PIA/VER: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "PIA/VER: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "PIA/VER: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    },
+    {
+      "name": "PIA/LEC: both paths pass through all 361 measured XY samples",
+      "passed": true
+    },
+    {
+      "name": "PIA/LEC: physical reference polyline scales to 4,259 m",
+      "passed": true
+    },
+    {
+      "name": "PIA/LEC: closed road, non-looping lap trajectories",
+      "passed": true
+    },
+    {
+      "name": "PIA/LEC: both recorded trajectories stay within the illustrative road",
+      "passed": true
+    }
+  ],
+  "metrics": [
+    {
+      "pair": "NOR/VER",
+      "max_sample_error_m": 4.577060545493686e-13,
+      "max_b_distance_from_reference_line_m": 2.1688649980373476,
+      "spline_length_m": 4249.395800932452
+    },
+    {
+      "pair": "NOR/LEC",
+      "max_sample_error_m": 4.577060545493686e-13,
+      "max_b_distance_from_reference_line_m": 1.8453133698278477,
+      "spline_length_m": 4249.395800932452
+    },
+    {
+      "pair": "NOR/PIA",
+      "max_sample_error_m": 4.577060545493686e-13,
+      "max_b_distance_from_reference_line_m": 1.8791248176460447,
+      "spline_length_m": 4249.395800932452
+    },
+    {
+      "pair": "VER/NOR",
+      "max_sample_error_m": 4.0362609644104965e-13,
+      "max_b_distance_from_reference_line_m": 1.8892666944995407,
+      "spline_length_m": 4254.686029221352
+    },
+    {
+      "pair": "VER/LEC",
+      "max_sample_error_m": 4.823324033076557e-13,
+      "max_b_distance_from_reference_line_m": 1.9664861066759716,
+      "spline_length_m": 4254.686029221352
+    },
+    {
+      "pair": "VER/PIA",
+      "max_sample_error_m": 4.578851029767356e-13,
+      "max_b_distance_from_reference_line_m": 2.2472738897934126,
+      "spline_length_m": 4254.686029221352
+    },
+    {
+      "pair": "LEC/NOR",
+      "max_sample_error_m": 4.2891661525952447e-13,
+      "max_b_distance_from_reference_line_m": 1.9201368697086154,
+      "spline_length_m": 4257.840171534895
+    },
+    {
+      "pair": "LEC/VER",
+      "max_sample_error_m": 4.0194366942304643e-13,
+      "max_b_distance_from_reference_line_m": 2.040122197392368,
+      "spline_length_m": 4257.840171534895
+    },
+    {
+      "pair": "LEC/PIA",
+      "max_sample_error_m": 4.046040225349525e-13,
+      "max_b_distance_from_reference_line_m": 1.8889989251836155,
+      "spline_length_m": 4257.840171534895
+    },
+    {
+      "pair": "PIA/NOR",
+      "max_sample_error_m": 5.727212210020344e-13,
+      "max_b_distance_from_reference_line_m": 1.907549049158339,
+      "spline_length_m": 4254.633923112316
+    },
+    {
+      "pair": "PIA/VER",
+      "max_sample_error_m": 4.046040225349525e-13,
+      "max_b_distance_from_reference_line_m": 1.8080252759069322,
+      "spline_length_m": 4254.633923112316
+    },
+    {
+      "pair": "PIA/LEC",
+      "max_sample_error_m": 4.121147867408581e-13,
+      "max_b_distance_from_reference_line_m": 2.0653162145376482,
+      "spline_length_m": 4254.633923112316
+    }
+  ]
+}

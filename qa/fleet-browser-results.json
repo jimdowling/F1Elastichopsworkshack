@@ -1,0 +1,194 @@
+{
+  "created_at": "2026-10-19T14:53:40.747Z",
+  "passed": 41,
+  "total": 41,
+  "duration_ms": 73996,
+  "measurements": {
+    "ghost_playing_audio": {
+      "rms": 0.05872072770396152,
+      "state": "running",
+      "contexts": 1
+    },
+    "ghost_paused_audio": {
+      "rms": 0,
+      "state": "running",
+      "contexts": 1
+    },
+    "race_playing_audio": {
+      "rms": 0.04453739585216145,
+      "state": "running",
+      "contexts": 2
+    }
+  },
+  "checks": [
+    {
+      "name": "New Ghost Lap defaults to the four-car comparison",
+      "passed": true
+    },
+    {
+      "name": "Four real 3D cars initialize",
+      "passed": true
+    },
+    {
+      "name": "Independent-lap scope is explicit",
+      "passed": true
+    },
+    {
+      "name": "Ghost order derives from real laps at the preview clock",
+      "passed": true
+    },
+    {
+      "name": "3D car mapping is a WebGL context",
+      "passed": true
+    },
+    {
+      "name": "Hiding a car redraws immediately while paused",
+      "passed": true
+    },
+    {
+      "name": "Any compared driver can be followed",
+      "passed": true
+    },
+    {
+      "name": "Circuit overview supports actual interactive 3D orbit",
+      "passed": true
+    },
+    {
+      "name": "Four-car finish deltas preserve recorded values",
+      "passed": true
+    },
+    {
+      "name": "No sound context exists before consent",
+      "passed": true
+    },
+    {
+      "name": "Enabling sound while paused remains silent",
+      "passed": true
+    },
+    {
+      "name": "Focused multi-car comparison has real browser audio output",
+      "passed": true
+    },
+    {
+      "name": "Pausing silences multi-car audio",
+      "passed": true
+    },
+    {
+      "name": "Immersive view exposes focus telemetry",
+      "passed": true
+    },
+    {
+      "name": "Escape exits the new immersive view",
+      "passed": true
+    },
+    {
+      "name": "Race mode loads all 20 synchronized cars",
+      "passed": true
+    },
+    {
+      "name": "Old comparison audio is cleaned up on mode switch",
+      "passed": true
+    },
+    {
+      "name": "Race scope describes shared-time observations",
+      "passed": true
+    },
+    {
+      "name": "Recorded race ranks differ from ghost fastest-lap order",
+      "passed": true
+    },
+    {
+      "name": "Physical distance is not mislabeled as official race interval",
+      "passed": true
+    },
+    {
+      "name": "The completed public import is disclosed",
+      "passed": true
+    },
+    {
+      "name": "Clicking an actual 3D car marker selects that driver",
+      "passed": true
+    },
+    {
+      "name": "All-car shared clock advances on playback",
+      "passed": true
+    },
+    {
+      "name": "Actual 3D race positions change with the shared clock",
+      "passed": true
+    },
+    {
+      "name": "Recorded field driver PIA has a working chase camera",
+      "passed": true
+    },
+    {
+      "name": "Recorded field driver ALB has a working chase camera",
+      "passed": true
+    },
+    {
+      "name": "Recorded field driver ZHO has a working chase camera",
+      "passed": true
+    },
+    {
+      "name": "Field filtering keeps original recorded ranks and restores a visible focus",
+      "passed": true
+    },
+    {
+      "name": "Lap preset seeks a real common-time race moment",
+      "passed": true
+    },
+    {
+      "name": "Opening-grid preset shows actual recorded positions",
+      "passed": true
+    },
+    {
+      "name": "Race-mode audio uses recorded telemetry and needs its own consent",
+      "passed": true
+    },
+    {
+      "name": "2D map preserves all actual position markers",
+      "passed": true
+    },
+    {
+      "name": "2D position markers select a driver",
+      "passed": true
+    },
+    {
+      "name": "20-car replay fits a mobile viewport without document overflow",
+      "passed": true
+    },
+    {
+      "name": "Mobile immersive view keeps playback controls accessible",
+      "passed": true
+    },
+    {
+      "name": "Original two-car analysis remains accessible",
+      "passed": true
+    },
+    {
+      "name": "No unexpected normal-path browser errors",
+      "passed": true
+    },
+    {
+      "name": "No external browser assets/requests required",
+      "passed": true
+    },
+    {
+      "name": "Missing position data hides one car rather than fabricating motion",
+      "passed": true
+    },
+    {
+      "name": "Missing focus switches safely to circuit overview",
+      "passed": true
+    },
+    {
+      "name": "WebGL-unavailable path retains the four-car 2D comparison",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "expected": [
+    "THREE.WebGLRenderer: Error creating WebGL context."
+  ],
+  "external": []
+}

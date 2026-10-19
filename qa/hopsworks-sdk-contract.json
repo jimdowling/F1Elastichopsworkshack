@@ -1,0 +1,9 @@
+{
+  "scope": "Installed SDK import/signature inspection only; no provider login or writes.",
+  "python": "3.13.16",
+  "hopsworks": "5.2.1",
+  "login": "(host: 'str | None' = None, port: 'int' = 443, project: 'str | None' = None, api_key_value: 'str | None' = None, api_key_file: 'str | None' = None, hostname_verification: 'bool' = False, trust_store_path: 'str | None' = None, cert_folder: 'str | None' = None, engine: \"Literal['spark', 'python', 'training', 'spark-no-metastore', 'spark-delta'] | None\" = None) -> 'project.Project'",
+  "insert": "(self, features: \"pd.DataFrame | pl.DataFrame | TypeVar('pyspark.sql.DataFrame') | TypeVar('pyspark.RDD') | np.ndarray | list[list]\", overwrite: 'bool' = False, operation: \"Literal['insert', 'upsert']\" = 'upsert', storage: 'str | None' = None, write_options: 'dict[str, Any] | None' = None, validation_options: 'dict[str, Any] | None' = None, wait: 'bool' = False, transformation_context: 'dict[str, Any]' = None, transform: 'bool' = True, n_processes: 'int | None' = None) -> 'tuple[Job | None, ValidationReport | None]'",
+  "read": "(self, online: 'bool' = False, dataframe_type: 'str' = 'default', read_options: 'dict[str, Any] | None' = None, start_time: 'str | int | date | datetime | None' = None, end_time: 'str | int | date | datetime | None' = None) -> \"pd.DataFrame | np.ndarray | list[list[Any]] | TypeVar('pyspark.sql.DataFrame') | TypeVar('pyspark.RDD')\"",
+  "live_validated": false
+}

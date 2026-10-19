@@ -1,0 +1,107 @@
+{
+  "run_at": "2026-10-19T14:54:59.800Z",
+  "checks": [
+    {
+      "name": "Four concept cards rendered",
+      "passed": true
+    },
+    {
+      "name": "Real-data zero-synthetic disclosure",
+      "passed": true
+    },
+    {
+      "name": "Shortlisting and comparison work",
+      "passed": true
+    },
+    {
+      "name": "Ghost replay animates real positions",
+      "passed": true
+    },
+    {
+      "name": "Ghost driver selection, swap, and channel selection work",
+      "passed": true
+    },
+    {
+      "name": "Pit slider recomputes backend scenario",
+      "passed": true
+    },
+    {
+      "name": "Restoring actual pit strategy recovers zero modeled change",
+      "passed": true
+    },
+    {
+      "name": "Illegal same-compound strategy is flagged",
+      "passed": true
+    },
+    {
+      "name": "Pace comparison reports baseline win",
+      "passed": true
+    },
+    {
+      "name": "Anomaly evidence can be inspected",
+      "passed": true
+    },
+    {
+      "name": "Anomaly threshold filter requests backend query",
+      "passed": true
+    },
+    {
+      "name": "Anonymous driver challenge reveals real label",
+      "passed": true
+    },
+    {
+      "name": "Four model vote shares displayed",
+      "passed": true
+    },
+    {
+      "name": "Next challenge and model-only reveal work",
+      "passed": true
+    },
+    {
+      "name": "Full pipeline reruns successfully from the UI",
+      "passed": true
+    },
+    {
+      "name": "Feature table CSV is downloadable",
+      "passed": true
+    },
+    {
+      "name": "Provenance includes local backend disclosure",
+      "passed": true
+    },
+    {
+      "name": "overview fits a 390px mobile viewport",
+      "passed": true
+    },
+    {
+      "name": "ghost fits a 390px mobile viewport",
+      "passed": true
+    },
+    {
+      "name": "pitwall fits a 390px mobile viewport",
+      "passed": true
+    },
+    {
+      "name": "pace fits a 390px mobile viewport",
+      "passed": true
+    },
+    {
+      "name": "dna fits a 390px mobile viewport",
+      "passed": true
+    },
+    {
+      "name": "Mobile navigation opens and navigates",
+      "passed": true
+    },
+    {
+      "name": "No external browser requests required",
+      "passed": true
+    },
+    {
+      "name": "No browser runtime or console errors",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "external_requests": []
+}

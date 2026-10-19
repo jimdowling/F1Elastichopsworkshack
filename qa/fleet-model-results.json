@@ -1,0 +1,170 @@
+{
+  "created_at": "2026-10-19T14:43:46.867Z",
+  "passed": 39,
+  "total": 39,
+  "duration_ms": 253,
+  "measurements": {
+    "shared_time_driver_frames": 22080,
+    "renderable_position_frames": 22080,
+    "hidden_invalid_frames": 0,
+    "max_xy_separation_m": 1032.9449396204254
+  },
+  "checks": [
+    {
+      "name": "Binary search handles boundaries and exact samples",
+      "passed": true
+    },
+    {
+      "name": "NOR: ghost motion clamps to recorded lap",
+      "passed": true
+    },
+    {
+      "name": "NOR: final RPM is recorded, not a fallback",
+      "passed": true
+    },
+    {
+      "name": "NOR: distance/time inverse is preserved",
+      "passed": true
+    },
+    {
+      "name": "VER: ghost motion clamps to recorded lap",
+      "passed": true
+    },
+    {
+      "name": "VER: final RPM is recorded, not a fallback",
+      "passed": true
+    },
+    {
+      "name": "VER: distance/time inverse is preserved",
+      "passed": true
+    },
+    {
+      "name": "LEC: ghost motion clamps to recorded lap",
+      "passed": true
+    },
+    {
+      "name": "LEC: final RPM is recorded, not a fallback",
+      "passed": true
+    },
+    {
+      "name": "LEC: distance/time inverse is preserved",
+      "passed": true
+    },
+    {
+      "name": "PIA: ghost motion clamps to recorded lap",
+      "passed": true
+    },
+    {
+      "name": "PIA: final RPM is recorded, not a fallback",
+      "passed": true
+    },
+    {
+      "name": "PIA: distance/time inverse is preserved",
+      "passed": true
+    },
+    {
+      "name": "Four-car finish order follows actual source lap times",
+      "passed": true
+    },
+    {
+      "name": "Finish differences are real recorded-lap comparisons",
+      "passed": true
+    },
+    {
+      "name": "All four ghost trajectories and equal-distance gaps remain valid throughout 301 frames",
+      "passed": true
+    },
+    {
+      "name": "Single-driver comparison is valid with zero relative gap",
+      "passed": true
+    },
+    {
+      "name": "Position data is not extrapolated before or after coverage",
+      "passed": true
+    },
+    {
+      "name": "A real sample remains available at a gap boundary",
+      "passed": true
+    },
+    {
+      "name": "Long position gaps are hidden, not linearly invented",
+      "passed": true
+    },
+    {
+      "name": "Short gaps interpolate only within observed brackets",
+      "passed": true
+    },
+    {
+      "name": "Physically implausible jumps are hidden",
+      "passed": true
+    },
+    {
+      "name": "Missing position streams stay missing",
+      "passed": true
+    },
+    {
+      "name": "Continuous telemetry interpolates; gear/brake use as-of samples",
+      "passed": true
+    },
+    {
+      "name": "Exact telemetry boundary selects the recorded gear",
+      "passed": true
+    },
+    {
+      "name": "Telemetry gaps/bounds do not produce fake RPM",
+      "passed": true
+    },
+    {
+      "name": "Out-of-range source values become unavailable, not silently clipped",
+      "passed": true
+    },
+    {
+      "name": "An exact valid telemetry sample survives an invalid later neighbor",
+      "passed": true
+    },
+    {
+      "name": "Recorded streams define a real common race window",
+      "passed": true
+    },
+    {
+      "name": "Every five-second frame across the recorded race has 20 consistent as-of rows",
+      "passed": true
+    },
+    {
+      "name": "Displayed positions have valid shared-time brackets; invalid intervals remain hidden",
+      "passed": true
+    },
+    {
+      "name": "Initial race view has all 20 recorded-position cars",
+      "passed": true
+    },
+    {
+      "name": "Default ranks reflect recorded VER lead, not fastest ghost order",
+      "passed": true
+    },
+    {
+      "name": "Focus separation is derived from actual common-time XY",
+      "passed": true
+    },
+    {
+      "name": "A recorded next-lap start wins over a millisecond-overlapping duration endpoint",
+      "passed": true
+    },
+    {
+      "name": "Final classification is used only once all recorded lap endpoints are reached",
+      "passed": true
+    },
+    {
+      "name": "Partial driver coverage never extrapolates a hidden car",
+      "passed": true
+    },
+    {
+      "name": "Long coverage gaps in one driver do not shrink the whole replay window",
+      "passed": true
+    },
+    {
+      "name": "Clock formatter never implies a live feed",
+      "passed": true
+    }
+  ]
+}

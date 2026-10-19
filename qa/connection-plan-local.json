@@ -1,0 +1,12 @@
+{
+  "feature_group": "pitlane_yourteam_race_pace",
+  "version": 1,
+  "rows": 20,
+  "batch_id": "e81916d9fb107155c6d129a3847387baac7c47a4115b013740cdfd4399af0ac7",
+  "source_mode": "local",
+  "season": 2024,
+  "round_number": 15,
+  "clean": true,
+  "cutoff": 1.07,
+  "write_performed": false
+}

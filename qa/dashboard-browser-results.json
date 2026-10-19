@@ -1,0 +1,566 @@
+{
+  "created_at": "2026-10-19T14:58:13.430Z",
+  "duration_ms": 84330,
+  "passed": 137,
+  "total": 137,
+  "errors": [],
+  "external": [],
+  "measurements": {
+    "expected_recovery_console": [
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    ],
+    "dashboard_requests": 83,
+    "mobile_viewport": "390×844",
+    "desktop_viewport": "1440×1050"
+  },
+  "checks": [
+    {
+      "name": "Dashboard is the main workspace",
+      "passed": true
+    },
+    {
+      "name": "Archive scope defaults to 2024 R15",
+      "passed": true
+    },
+    {
+      "name": "Home has classified winner and honest archive scope",
+      "passed": true
+    },
+    {
+      "name": "3D engine is still lazy-loaded on dashboard",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Dashboard",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Dashboard",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Historical timing",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Historical timing",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Race calendar",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Race calendar",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Session results",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Session results",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Driver standings",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Driver standings",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Constructor standings",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Constructor standings",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Drivers & profiles",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Drivers & profiles",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Teams",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Teams",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Driver statistics",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Driver statistics",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Head to head",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Head to head",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Consistency",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Consistency",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Race pace",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Race pace",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Pit-lane analysis",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Pit-lane analysis",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Tyres & stints",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Tyres & stints",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Weather & conditions",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Weather & conditions",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Race control",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Race control",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Track DNA",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Track DNA",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Coverage & schema",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Coverage & schema",
+      "passed": true
+    },
+    {
+      "name": "Desktop route: Connections",
+      "passed": true
+    },
+    {
+      "name": "Desktop layout: Connections",
+      "passed": true
+    },
+    {
+      "name": "2024 final driver standings show 437 points",
+      "passed": true
+    },
+    {
+      "name": "Season selector maps Abu Dhabi to 2023 R22",
+      "passed": true
+    },
+    {
+      "name": "2023 final standings show 575 points, not stale 2024 data",
+      "passed": true
+    },
+    {
+      "name": "Standings sort ascending",
+      "passed": true
+    },
+    {
+      "name": "Standings sort descending",
+      "passed": true
+    },
+    {
+      "name": "Standings text filter",
+      "passed": true
+    },
+    {
+      "name": "2023 constructor points reconcile in the UI",
+      "passed": true
+    },
+    {
+      "name": "2024 constructor champion is McLaren at 666",
+      "passed": true
+    },
+    {
+      "name": "Full 2024 schedule has 24 real weekends",
+      "passed": true
+    },
+    {
+      "name": "Calendar search narrows to the selected venue",
+      "passed": true
+    },
+    {
+      "name": "Calendar timezone conversion changes actual session times",
+      "passed": true
+    },
+    {
+      "name": "Calendar opens the matching classified results",
+      "passed": true
+    },
+    {
+      "name": "Qualifying segment fields render",
+      "passed": true
+    },
+    {
+      "name": "Non-sprint weekends have a clear empty state",
+      "passed": true
+    },
+    {
+      "name": "Session preference survives race switching and a real Sprint loads",
+      "passed": true
+    },
+    {
+      "name": "Sprint CSV downloads with correct dimensions",
+      "passed": true
+    },
+    {
+      "name": "Driver directory filters to one real profile",
+      "passed": true
+    },
+    {
+      "name": "Driver cards open the selected profile",
+      "passed": true
+    },
+    {
+      "name": "Profile driver selector is wired",
+      "passed": true
+    },
+    {
+      "name": "All-driver statistics are available",
+      "passed": true
+    },
+    {
+      "name": "Season-stat mode survives a season change",
+      "passed": true
+    },
+    {
+      "name": "Replacement driver appears in the season comparison",
+      "passed": true
+    },
+    {
+      "name": "Season-stat export contains aggregated fields",
+      "passed": true
+    },
+    {
+      "name": "Ten constructor cards with real contributions",
+      "passed": true
+    },
+    {
+      "name": "Teammate shortcut selects Norris and Piastri",
+      "passed": true
+    },
+    {
+      "name": "Paired qualifying score is 12–3",
+      "passed": true
+    },
+    {
+      "name": "Arbitrary driver comparison changes the evidence",
+      "passed": true
+    },
+    {
+      "name": "Consistency exposes the DNF inclusion choice",
+      "passed": true
+    },
+    {
+      "name": "Sprint distribution has observed entries",
+      "passed": true
+    },
+    {
+      "name": "Pace filter changes observed sample count",
+      "passed": true
+    },
+    {
+      "name": "Pace cutoff reaches the backend with the selected value",
+      "passed": true
+    },
+    {
+      "name": "Pace distribution uses selected drivers",
+      "passed": true
+    },
+    {
+      "name": "Empty driver selection does not fabricate traces",
+      "passed": true
+    },
+    {
+      "name": "Restoring all drivers restores all distributions",
+      "passed": true
+    },
+    {
+      "name": "Pace chart mode: Positions",
+      "passed": true
+    },
+    {
+      "name": "Pace chart mode: Speed traps",
+      "passed": true
+    },
+    {
+      "name": "Pace chart mode: Fastest 20",
+      "passed": true
+    },
+    {
+      "name": "Pace chart mode: Lap times",
+      "passed": true
+    },
+    {
+      "name": "Chart hover reads real observations",
+      "passed": true
+    },
+    {
+      "name": "Season pit-lane scope and cumulative chart work",
+      "passed": true
+    },
+    {
+      "name": "Pit-lane vs. stationary-time distinction is prominent",
+      "passed": true
+    },
+    {
+      "name": "Pit log filters to Norris",
+      "passed": true
+    },
+    {
+      "name": "Tyre bands cover the field and table respects compound filter",
+      "passed": true
+    },
+    {
+      "name": "Qualifying weather loads the real 79-sample slice",
+      "passed": true
+    },
+    {
+      "name": "Weather metric tabs change the plotted measurement",
+      "passed": true
+    },
+    {
+      "name": "Race-control flag filter uses recorded flags",
+      "passed": true
+    },
+    {
+      "name": "Race-control search has a correct empty state",
+      "passed": true
+    },
+    {
+      "name": "Missing Monaco length produces no invented similarity",
+      "passed": true
+    },
+    {
+      "name": "Supported venue has three evidence-based similar events",
+      "passed": true
+    },
+    {
+      "name": "Coverage uses actual archive counts",
+      "passed": true
+    },
+    {
+      "name": "All five published index dimensions are mapped",
+      "passed": true
+    },
+    {
+      "name": "Unsupported sections have explicit data-backed replacements",
+      "passed": true
+    },
+    {
+      "name": "Query template copies to clipboard",
+      "passed": true
+    },
+    {
+      "name": "Feature generation refreshes persisted read-back evidence",
+      "passed": true
+    },
+    {
+      "name": "Schema preview uses the chosen session and boolean rainfall",
+      "passed": true
+    },
+    {
+      "name": "Schema JSON downloads with provenance and correct row count",
+      "passed": true
+    },
+    {
+      "name": "Telemetry export is the real four-trace subset",
+      "passed": true
+    },
+    {
+      "name": "Unsupported telemetry selection stays empty",
+      "passed": true
+    },
+    {
+      "name": "Timing scrub reaches a real historical frame",
+      "passed": true
+    },
+    {
+      "name": "Timing replay plays and pauses deterministically",
+      "passed": true
+    },
+    {
+      "name": "Timing driver drill-down has actual lap rows",
+      "passed": true
+    },
+    {
+      "name": "Evidence dialog closes with Escape",
+      "passed": true
+    },
+    {
+      "name": "Final timing frame is explicitly classified",
+      "passed": true
+    },
+    {
+      "name": "Reset clears completed-lap timing",
+      "passed": true
+    },
+    {
+      "name": "Japan restart replay advances rather than reversing its clock",
+      "passed": true
+    },
+    {
+      "name": "Light theme changes the actual application palette",
+      "passed": true
+    },
+    {
+      "name": "Theme and scope survive reload",
+      "passed": true
+    },
+    {
+      "name": "Sidebar really collapses",
+      "passed": true
+    },
+    {
+      "name": "Collapsed navigation still works",
+      "passed": true
+    },
+    {
+      "name": "Archive controls do not relabel the original 3D experiment",
+      "passed": true
+    },
+    {
+      "name": "Returning from a lab restores the historical archive selection",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Dashboard",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Historical timing",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Race calendar",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Session results",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Driver standings",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Constructor standings",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Drivers & profiles",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Teams",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Driver statistics",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Head to head",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Consistency",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Race pace",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Pit-lane analysis",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Tyres & stints",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Weather & conditions",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Race control",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Track DNA",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Coverage & schema",
+      "passed": true
+    },
+    {
+      "name": "Mobile route and layout: Connections",
+      "passed": true
+    },
+    {
+      "name": "Mobile historical replay scrub is operable",
+      "passed": true
+    },
+    {
+      "name": "Mobile menu closes with Escape",
+      "passed": true
+    },
+    {
+      "name": "A transient data error has a working retry path",
+      "passed": true
+    },
+    {
+      "name": "No unexpected browser errors",
+      "passed": true
+    },
+    {
+      "name": "No external requests are required",
+      "passed": true
+    }
+  ]
+}

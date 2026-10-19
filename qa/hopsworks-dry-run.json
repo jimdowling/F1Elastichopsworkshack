@@ -1,0 +1,22 @@
+{
+  "mode": "DRY RUN \u2014 no external calls",
+  "target": "hopsworks",
+  "plan": [
+    {
+      "destination": "pitlane_demo_ghost_features",
+      "rows": 1444
+    },
+    {
+      "destination": "pitlane_demo_pace_features",
+      "rows": 1196
+    },
+    {
+      "destination": "pitlane_demo_dna_features",
+      "rows": 275
+    },
+    {
+      "destination": "pitlane_demo_strategy_features",
+      "rows": 1348
+    }
+  ]
+}

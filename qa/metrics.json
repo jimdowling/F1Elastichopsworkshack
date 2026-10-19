@@ -1,0 +1,332 @@
+{
+  "pace_report": {
+    "train_rows": 659,
+    "validation_rows": 257,
+    "test_rows": 280,
+    "eligible_rows": 1196,
+    "raw_rows": 1425,
+    "baseline_mae": 0.361525,
+    "model_mae": 0.412548,
+    "improvement_pct": -14.11336,
+    "validation_mae": 0.434201,
+    "inputs": [
+      "lap_number",
+      "tyre_life",
+      "rolling_median",
+      "rolling_mean",
+      "rolling_std",
+      "previous_lap_s",
+      "driver_code",
+      "compound"
+    ],
+    "importance": [
+      {
+        "name": "Previous Lap S",
+        "value": 0.348206
+      },
+      {
+        "name": "Rolling Median",
+        "value": 0.296281
+      },
+      {
+        "name": "Rolling Mean",
+        "value": 0.269527
+      },
+      {
+        "name": "Rolling Std",
+        "value": 0.025215
+      },
+      {
+        "name": "Lap Number",
+        "value": 0.023636
+      },
+      {
+        "name": "Driver",
+        "value": 0.017666
+      },
+      {
+        "name": "Tyre Life",
+        "value": 0.016078
+      },
+      {
+        "name": "Compound",
+        "value": 0.00339
+      }
+    ],
+    "note": "One-race, retrospective clean-lap evaluation. Not cross-race validation. Models may lose to the baseline."
+  },
+  "dna_report": {
+    "train_rows": 187,
+    "validation_rows": 28,
+    "test_rows": 60,
+    "classes": [
+      "NOR",
+      "VER",
+      "LEC",
+      "PIA"
+    ],
+    "accuracy": 0.85,
+    "confusion": [
+      [
+        7,
+        0,
+        0,
+        8
+      ],
+      [
+        0,
+        15,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        15,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        14
+      ]
+    ],
+    "chance_accuracy": 0.25,
+    "feature_count": 12,
+    "features": [
+      "mean_speed",
+      "p95_speed",
+      "speed_std",
+      "full_throttle",
+      "brake_fraction",
+      "mean_throttle",
+      "mean_rpm",
+      "mean_gear",
+      "drs_fraction",
+      "accel_std",
+      "low_speed",
+      "high_gear_fraction"
+    ],
+    "importance": [
+      {
+        "name": "Engine RPM",
+        "key": "mean_rpm",
+        "value": 0.309637
+      },
+      {
+        "name": "Braking",
+        "key": "brake_fraction",
+        "value": 0.170097
+      },
+      {
+        "name": "High gears",
+        "key": "high_gear_fraction",
+        "value": 0.144986
+      },
+      {
+        "name": "Throttle input",
+        "key": "mean_throttle",
+        "value": 0.13145
+      },
+      {
+        "name": "Speed variation",
+        "key": "speed_std",
+        "value": 0.053819
+      },
+      {
+        "name": "Gear usage",
+        "key": "mean_gear",
+        "value": 0.053214
+      },
+      {
+        "name": "Corner speed",
+        "key": "low_speed",
+        "value": 0.035327
+      },
+      {
+        "name": "Average speed",
+        "key": "mean_speed",
+        "value": 0.027959
+      },
+      {
+        "name": "Full throttle",
+        "key": "full_throttle",
+        "value": 0.027075
+      },
+      {
+        "name": "Acceleration variation",
+        "key": "accel_std",
+        "value": 0.020926
+      },
+      {
+        "name": "Top-end speed",
+        "key": "p95_speed",
+        "value": 0.019064
+      },
+      {
+        "name": "DRS usage",
+        "key": "drs_fraction",
+        "value": 0.006447
+      }
+    ],
+    "archetypes": {
+      "LEC": [
+        0.626394,
+        0.699581,
+        0.557446,
+        0.515801,
+        0.683529,
+        0.114031
+      ],
+      "NOR": [
+        0.370831,
+        0.425977,
+        0.306521,
+        0.279893,
+        0.827539,
+        0.0
+      ],
+      "PIA": [
+        0.330864,
+        0.438697,
+        0.406179,
+        0.313113,
+        0.740427,
+        0.0
+      ],
+      "VER": [
+        0.709218,
+        0.175042,
+        0.151694,
+        0.773679,
+        0.121571,
+        0.0
+      ]
+    },
+    "radar_labels": [
+      "Full throttle",
+      "Braking",
+      "Top-end speed",
+      "Gear usage",
+      "Engine RPM",
+      "DRS usage"
+    ],
+    "note": "Identifies four same-race driver\u2013car combinations. Car, tyres, DRS, and track conditions confound style. Votes are not calibrated probabilities."
+  },
+  "strategy_report": {
+    "rows": 1348,
+    "age_coefficient": 0.040902,
+    "fuel_coefficient": -0.039702,
+    "raw_age_coefficient": 0.040902,
+    "raw_fuel_coefficient": -0.039702,
+    "compound_offsets": {
+      "HARD": -0.148045,
+      "MEDIUM": 0.166576,
+      "SOFT": -0.01853
+    },
+    "pit_loss": 23.139846,
+    "pit_loss_pairs": 26,
+    "pit_loss_source": "Median pit-in/out excess vs fitted clean pace",
+    "compound_counts": {
+      "HARD": 776,
+      "MEDIUM": 469,
+      "SOFT": 103
+    },
+    "compound_max_age": {
+      "HARD": 57,
+      "MEDIUM": 32,
+      "SOFT": 24
+    },
+    "note": "In-sample calibration for an illustrative simulator, not validated strategy prediction. Fuel/tyre/traffic effects are confounded."
+  },
+  "pipeline": {
+    "status": "ready",
+    "built_at": "2026-10-18T16:06:18.081725+00:00",
+    "duration_seconds": 1.165,
+    "steps": [
+      {
+        "name": "Validate & index observations",
+        "rows": 1425,
+        "seconds": 0.036,
+        "status": "complete",
+        "detail": "SHA-256 verified; real OpenF1 records indexed in local SQLite"
+      },
+      {
+        "name": "Align & read back replay features",
+        "rows": 1444,
+        "seconds": 0.027,
+        "status": "complete",
+        "detail": "Four real lap traces; all replay channels consumed from the persisted feature table"
+      },
+      {
+        "name": "Engineer & read back pace features",
+        "rows": 1196,
+        "seconds": 0.176,
+        "status": "complete",
+        "detail": "Past-only rolling windows; persisted feature-table round trip"
+      },
+      {
+        "name": "Train & evaluate pace model",
+        "rows": 280,
+        "seconds": 0.482,
+        "status": "complete",
+        "detail": "Chronological train \u226443 / validation 44\u201357 / test \u226558"
+      },
+      {
+        "name": "Calibrate strategy simulator",
+        "rows": 1348,
+        "seconds": 0.089,
+        "status": "complete",
+        "detail": "Ridge-calibrated pace assumptions; not a causal model"
+      },
+      {
+        "name": "Train & evaluate driver\u2013car classifier",
+        "rows": 60,
+        "seconds": 0.337,
+        "status": "complete",
+        "detail": "Telemetry-only features; whole-lap chronological holdout"
+      },
+      {
+        "name": "Publish local application results",
+        "rows": 1196,
+        "seconds": 0.019,
+        "status": "complete",
+        "detail": "Queryable results; all four experiences ready"
+      }
+    ],
+    "search_backend": "SQLite \u00b7 local Elastic substitute",
+    "feature_backend": "SQLite \u00b7 local Hopsworks substitute",
+    "cloud_connected": false,
+    "groups": [
+      {
+        "name": "ghost_features",
+        "rows": 1444,
+        "version": 1,
+        "primary_key": "id",
+        "read_back": true
+      },
+      {
+        "name": "pace_features",
+        "rows": 1196,
+        "version": 1,
+        "primary_key": "id",
+        "read_back": true
+      },
+      {
+        "name": "dna_features",
+        "rows": 275,
+        "version": 1,
+        "primary_key": "id",
+        "read_back": true
+      },
+      {
+        "name": "strategy_features",
+        "rows": 1348,
+        "version": 1,
+        "primary_key": "id",
+        "read_back": true
+      }
+    ]
+  }
+}

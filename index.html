@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F1 × Elastic × Hopsworks | PITLANE</title>
+<style>
+:root{color-scheme:dark;--bg:#0d131a;--panel:#151f29;--line:#293744;--text:#f3f6fa;--muted:#aab7c5;--blue:#4db3f2;--green:#42d6a1;--lime:#c7f36b;--gold:#f5c65b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0,#1c2b38 0,transparent 42%),var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1120px;margin:auto;padding:64px 28px 80px}.eyebrow{color:var(--green);font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}h1{font-size:clamp(36px,6vw,68px);line-height:1.02;max-width:850px;margin:16px 0}h2{font-size:22px;margin:0 0 14px}.lead{font-size:19px;color:var(--muted);max-width:770px}.tag{display:inline-block;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 13px;color:var(--blue);font-size:12px;font-weight:700;margin-top:14px}
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:48px 0 30px}.card{background:linear-gradient(180deg,#192632,var(--panel));border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:15px;padding:18px;min-height:190px}.card b{display:block;color:var(--accent);font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}.card p{margin:0;color:#d6dee7;font-size:14px}.scope{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:26px 0}.box{border:1px solid var(--line);background:#111a23;border-radius:14px;padding:22px}.box p{color:var(--muted);margin:0}.actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0 36px}a.button{color:#10151b;background:var(--lime);font-weight:700;text-decoration:none;border-radius:9px;padding:11px 16px}a.alt{color:var(--text);background:var(--panel);border:1px solid var(--line)}img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:14px;margin-top:16px}footer{margin-top:35px;color:var(--muted);font-size:13px}footer a{color:var(--blue)}
+@media(max-width:850px){.flow{grid-template-columns:1fr 1fr}.scope{grid-template-columns:1fr}}@media(max-width:540px){.flow{grid-template-columns:1fr}main{padding:38px 18px}}
+</style>
+</head>
+<body><main>
+<p class="eyebrow">F1 · Elastic · Hopsworks · Hack night</p>
+<h1>From race data<br>to trusted pace.</h1>
+<p class="lead">PITLANE turns bounded Elastic race observations into per-driver pace features, verifies their Hopsworks read-back, and uses those values in the Race Pace dashboard.</p>
+<span class="tag">CURRENT VERIFIED BATCH · 2024 DUTCH GP RACE · 20 DRIVERS</span>
+<section class="flow" aria-label="Data workflow">
+<article class="card" style="--accent:var(--blue)"><b>01 · Elastic</b><p>Read-only source. Select season, round and session; telemetry is limited to one driver and lap.</p></article>
+<article class="card" style="--accent:var(--gold)"><b>02 · Python</b><p>Validate, filter and aggregate per-driver pace: median, spread and sample count.</p></article>
+<article class="card" style="--accent:var(--green)"><b>03 · Hopsworks</b><p>Versioned Feature Group with batches bound to their source and filter settings.</p></article>
+<article class="card" style="--accent:var(--blue)"><b>04 · Read back</b><p>Verify feature IDs, row count and values before activating the batch.</p></article>
+<article class="card" style="--accent:var(--lime)"><b>05 · PITLANE</b><p>Race Pace consumes verified Hopsworks summaries; raw lap evidence remains in Elastic.</p></article>
+</section>
+<section class="scope">
+<div class="box"><h2>Data scope</h2><p>The shared Elastic source is the Dutch GP 2023/2024 lite dataset. The current Hopsworks batch is the 2024 Race, with 20 driver summaries. No full telemetry corpus is downloaded.</p></div>
+<div class="box"><h2>Honest boundary</h2><p>Ghost Lap, Pitwall, Pace Detective and Driver DNA are separate local prototypes. This GitHub Pages site is a static overview; the interactive app requires its FastAPI backend.</p></div>
+</section>
+<div class="actions"><a class="button" href="presentation/Elastic-Hopsworks-Workflow.pptx">Download workflow slide</a><a class="button alt" href="https://github.com/knarayanareddy/F1Elastichopsworkshack">Browse source repository</a></div>
+<h2>Workflow slide</h2><img src="presentation/Elastic-Hopsworks-Workflow.png" alt="Elastic to Python to Hopsworks verified read-back workflow slide">
+<footer>Run the interactive dashboard locally from the repository README. Provider credentials stay in the backend environment and are not part of this site.</footer>
+</main></body></html>
