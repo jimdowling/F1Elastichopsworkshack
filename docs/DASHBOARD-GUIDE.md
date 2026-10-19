@@ -4,7 +4,7 @@ The default workspace is an independent **2023–2024 historical F1 dashboard**,
 
 ## Version 2.1 connection layer
 
-This guide's archive counts/methods describe the **bundled public-data mode**. The added **Connections** page (19th dashboard/control view) can configure native Elastic queries and actual Hopsworks pace read-back without application-code changes for the documented event schema. Use [CLOUD-SETUP.md](CLOUD-SETUP.md) for secure setup, provider checks, mode switching, permissions, limits and the hybrid-source boundary. No live accounts were validated during delivery.
+This guide's archive counts/methods describe the **bundled public-data mode**. The added **Connections** page (19th dashboard/control view) can configure native Hopsworks event-table reads and actual Hopsworks pace read-back without application-code changes for the documented event schema. Use [CLOUD-SETUP.md](CLOUD-SETUP.md) for secure setup, provider checks, mode switching, permissions, limits and the hybrid-source boundary. No live accounts were validated during delivery.
 
 Native schema exports preserve native values, including Qualifying laps when available. Native telemetry requires a driver/lap bound. Public timing replay stays separate because native lap endpoints are absent; weather UTC values are not invented. Original experiments remain local and separately scoped.
 
@@ -17,7 +17,7 @@ Open the app's live preview, or run the downloaded project as described in `READ
 3. Open **Historical timing**, play or scrub the lap control, choose a driver watchlist, and open a driver's lap evidence. This is a retrospective timing desk, not a live feed or full-field 3D simulation.
 4. Open **Race pace**. Select drivers, change the pit/outlier filter, and compare lap times, distributions, positions, speed traps and the fastest 20 laps. Inspect the persisted feature read-back beneath the charts.
 5. Explore **Tyres & stints**, **Pit-lane analysis**, **Weather & conditions**, and **Race control** for the context behind an unusual lap.
-6. Open **Coverage & schema** for exact loaded counts, quality gaps, schema alignment, feature methods, a copyable ES|QL template, and real JSON previews/downloads.
+6. Open **Coverage & schema** for exact loaded counts, quality gaps, schema alignment, feature methods, a copyable Hopsworks query template, and real JSON previews/downloads.
 7. Use the **Experiments** navigation group for Ghost Lap, Pitwall Sandbox, Pace Detective and Driver DNA. Their explicit **2024 Dutch GP** scope is independent of the dashboard's season selection. Returning to the dashboard restores that selection.
 
 Dark/light appearance, sidebar state, archive scope and relevant page controls are saved in the browser. The mobile sidebar is a drawer; wide evidence tables scroll inside their cards rather than widening the whole document. Data failures expose a retry action.
@@ -129,7 +129,7 @@ GET /api/dashboard/schema/{index}.json?season=2024&round=15&session=Race
 
 That example illustrates the shape, **not** the Dutch GP lap count. The real 2024 R15 Race export contains 1 session, 20 results, 1,426 laps, 153 weather observations or 1,444 telemetry samples depending on the selected index; Qualifying weather contains 79 samples. The UI previews actual records and offers the same JSON for download.
 
-This envelope is **not** an Elasticsearch bulk-ingest body. Ingest the `records` explicitly with appropriate IDs/mappings in your own writable destination; preserve the provenance and notes separately. A lap key should include season, round, session, driver and lap; telemetry needs timestamp/sample identity as well.
+This envelope is **not** a feature-group insert. To load the archive into Hopsworks, use `python scripts/connect_cloud.py load-source`, which assigns stable IDs and explicit types; preserve the provenance and notes separately. A lap key should include season, round, session, driver and lap; telemetry needs timestamp/sample identity as well.
 
 ## 5. Historical timing methodology
 
@@ -181,18 +181,18 @@ CSV kinds: `results`, `laps`, `weather`, `pits`, `stints`, `race-control`, `feat
 
 `src/dashboard.py` loads normalized classifications into `dashboard_results` and generates/read-backs `race_pace_features`. The disposable database is `.cache/dashboard-runtime.sqlite`; deleting it is safe while the server is stopped. The router serializes access to the shared SQLite connection. The original engine/database and all original APIs remain separate and intact.
 
-The public-mode workbench offers a copyable **ES|QL template** and genuine selected-provider feature reads/building. It does not execute arbitrary SQL/ES|QL. Version 2.1 Connections uses fixed, bounded read-only Elastic queries and an explicit Hopsworks batch workflow. The older optional cloud publisher still applies only to original-lab feature groups; it is distinct from the new dashboard runtime.
+The public-mode workbench offers a copyable **Hopsworks Python query template** and genuine selected-provider feature reads/building. It does not execute arbitrary queries. Version 2.1 Connections uses fixed, bounded read-only Hopsworks feature-group reads and an explicit Hopsworks batch workflow. The older optional cloud publisher still applies only to original-lab feature groups; it is distinct from the new dashboard runtime.
 
 ## 8. Taking the idea to the hackathon
 
 1. Confirm the event's rule about code written on the day. This prebuild is exploratory and **not certified submission-compliant**.
 2. Connect to the organizer's actual data using their supplied connection instructions/permissions. Do not write into source indices or assume the published record counts have been verified here.
 3. Configure the included native adapter and compare counts, units, nulls and timestamp semantics on a small known session before scaling.
-4. Choose one bounded story: for example, retrieve Dutch GP laps/weather/race-control context with Elastic, materialize a genuine Hopsworks pace feature group, then explain a lap in the existing UI concept.
+4. Choose one bounded story: for example, retrieve Dutch GP laps/weather context from the Hopsworks event tables, materialize a genuine Hopsworks pace feature group, then explain a lap in the existing UI concept.
 5. Use a team-owned writable destination and explicit feature keys. Verify write **and read-back** before claiming a cloud feature store. Do not publish secrets or imply that local SQLite proves cloud integration.
 6. Keep the one-race ML evaluation separate from descriptive two-season views. Larger telemetry availability is an opportunity for a new experiment, not evidence of generalization.
 
-The event's published full telemetry corpus was not downloaded. No event credentials were used and no Elastic/Hopsworks account writes occurred during this expansion.
+The event's published full telemetry corpus was not downloaded. No event credentials were used and no Hopsworks account writes occurred during this expansion.
 
 ## Version 2.2 / Ghost Lap expansion
 

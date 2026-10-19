@@ -1,83 +1,66 @@
-"""Optional publishing bridges, NOT the active web application's backends.
-Live connection validation requires user-supplied accounts and has not been run.
-No delete operations. Publishing must be explicitly requested by the CLI.
+"""Explicit Hopsworks publishing, NOT the web application's request path.
+
+Two jobs, both CLI-driven and dry-run by default:
+- load the public 2023-2024 archive into the event source feature groups
+  (f1_sessions, f1_results, f1_laps, f1_weather, f1_telemetry) that the
+  dashboard reads in Hopsworks data mode;
+- publish the original Dutch GP lab feature tables.
+No delete operations. Every write is followed by an ID read-back.
 """
-import json, re, os
-from pathlib import Path
-from urllib.parse import urlparse
+import re
 import pandas as pd
-import requests
-from .engine import safe
+from .remote import FIELDS,HopsConnection,digest
 
 GROUPS=('ghost_features','pace_features','dna_features','strategy_features')
+KEYS={'sessions':['season','round_number','session_name'],'results':['season','round_number','session_name','driver_code'],
+    'laps':['season','round_number','session_name','driver_code','lap_number'],'weather':['season','round_number','session_name','session_time_s'],
+    'telemetry':['season','round_number','session_name','driver_code','lap_number','session_time_s']}
+INTS={'season','round_number','driver_number','position','grid_position','fastest_lap_ms','lap_number','lap_duration_ms','duration_sector_1','duration_sector_2','duration_sector_3','tyre_life','speed','rpm','throttle','n_gear','drs'}
+BOOLS={'is_pit_out_lap','is_pit_in_lap','rainfall','brake','is_interpolated'}
+STRINGS={'event_name','session_name','country','location','session_date','driver_code','full_name','team_name','status','compound','track_status'}
 
 def validate_prefix(prefix):
     if not re.fullmatch(r'pitlane_[a-z][a-z0-9_]{2,30}',prefix):
-        raise ValueError('Use an isolated prefix such as pitlane_yourteam; never an organizer source index.')
+        raise ValueError('Use an isolated prefix such as pitlane_yourteam; never a source feature-group name.')
     return prefix
 
-def elastic_name(prefix,group):return validate_prefix(prefix).replace('_','-')+'-'+group.replace('_','-')
+def typed(kind,rows):
+    """Explicit nullable dtypes so Hopsworks infers stable bigint/double/boolean/string features."""
+    columns=FIELDS[kind]+sorted({k for r in rows for k in r}-set(FIELDS[kind]))
+    frame=pd.DataFrame(rows,columns=columns)
+    for c in frame.columns:
+        if c in INTS:frame[c]=frame[c].astype('Int64')
+        elif c in BOOLS:frame[c]=frame[c].astype('boolean')
+        elif c in STRINGS:frame[c]=frame[c].astype('string')
+        else:frame[c]=frame[c].astype('Float64')
+    ids=[digest([kind,*[None if pd.isna(v) else v for v in key]]) for key in frame[KEYS[kind]].astype(object).itertuples(index=False)]
+    frame.insert(0,'id',pd.array(ids,dtype='string'))
+    if not frame.id.is_unique:raise ValueError(f'Duplicate {kind} keys in the public archive; refusing an ambiguous source load.')
+    return frame
 
-def frame_records(frame):
-    return [safe(x) for x in frame.where(pd.notna(frame),None).to_dict(orient='records')]
-
-def mapping(frame):
-    fields={}
-    for col in frame.columns:
-        dtype=frame[col].dtype
-        typ='boolean' if pd.api.types.is_bool_dtype(dtype) else 'long' if pd.api.types.is_integer_dtype(dtype) else 'double' if pd.api.types.is_numeric_dtype(dtype) else 'keyword'
-        fields[col]={'type':typ}
-    return {'mappings':{'properties':fields}}
-
-def bulk_payload(index,records):
-    lines=[]
-    for r in records:
-        lines.extend([json.dumps({'index':{'_index':index,'_id':str(r['id'])}}),json.dumps(r,allow_nan=False)])
-    return '\n'.join(lines)+'\n'
-
-class ElasticPublisher:
-    def __init__(self,url,key,session=None):
-        u=urlparse(url)
-        if u.scheme!='https' and not (u.scheme=='http' and u.hostname in ('localhost','127.0.0.1')):
-            raise ValueError('Elastic endpoint must use HTTPS, except local development.')
-        if not key:raise ValueError('An API key for your writable destination is required.')
-        self.url=url.rstrip('/');self.session=session or requests.Session()
-        self.session.headers.update({'Authorization':f'ApiKey {key}','Content-Type':'application/json'})
-    def publish(self,prefix,frames):
-        report=[]
-        for group,frame in frames.items():
-            index=elastic_name(prefix,group);check=self.session.head(f'{self.url}/{index}',timeout=30)
-            if check.status_code==404:
-                self.session.put(f'{self.url}/{index}',json=mapping(frame),timeout=30).raise_for_status()
-            else:check.raise_for_status()
-            records=frame_records(frame)
-            for offset in range(0,len(records),500):
-                r=self.session.post(f'{self.url}/_bulk',params={'refresh':'wait_for'},data=bulk_payload(index,records[offset:offset+500]),headers={'Content-Type':'application/x-ndjson'},timeout=90)
-                r.raise_for_status()
-                if r.json().get('errors'):raise RuntimeError(f'Bulk indexing errors in {index}; inspect destination mapping/permissions.')
-            count=self.session.get(f'{self.url}/{index}/_count',timeout=30);count.raise_for_status()
-            read=self.session.post(f'{self.url}/{index}/_mget',json={'ids':[str(r['id']) for r in records[:5]]},timeout=30);read.raise_for_status()
-            if count.json()['count']<len(records) or not all(r.get('found') for r in read.json()['docs']):raise RuntimeError('Elastic read-back verification failed')
-            report.append({'index':index,'published_rows':len(records),'index_count':count.json()['count'],'sample_read_back':True})
-        return report
+def source_frames(db,kinds=FIELDS,seasons=(2023,2024)):
+    """Event-schema frames for every loaded public event (Race + Qualifying)."""
+    from .dashboard_api import local_source_rows
+    rows={k:[] for k in kinds}
+    for e in db.events:
+        if e['season'] not in seasons:continue
+        for session in ('Race','Qualifying'):
+            for kind in kinds:rows[kind].extend(local_source_rows(db,kind,e['season'],e['round_number'],session))
+    return {k:typed(k,v) for k,v in rows.items() if v}
 
 class HopsworksPublisher:
-    def __init__(self,host,project,key,client=None):
-        if not all([host,project,key]):raise ValueError('Hopsworks host, project name, and API key are required.')
-        if client is None:
-            import hopsworks
-            client=hopsworks
-        certs=Path(__file__).resolve().parents[1]/'.cache/hopsworks-certs';certs.mkdir(parents=True,exist_ok=True)
-        self.project=client.login(host=host,project=project,api_key_value=key,hostname_verification=True,cert_folder=str(certs))
-        self.store=self.project.get_feature_store()
+    def __init__(self,settings,client=None):
+        if not settings.hops_ready:raise ValueError('Hopsworks host, project name, and API key are required.')
+        self.settings=settings;self.store=HopsConnection(settings,client).connect()
+    def write(self,name,version,frame,description):
+        fg=self.store.get_or_create_feature_group(name=name,version=version,primary_key=['id'],online_enabled=False,description=description)
+        fg.insert(frame,write_options={'wait_for_job':True})
+        read=fg.select(['id']).read()
+        if not set(frame.id.astype(str)).issubset(set(read.id.astype(str))):raise RuntimeError(f'Feature group read-back incomplete: {name}')
+        return {'feature_group':name,'version':version,'published_rows':len(frame),'read_rows':len(read),'id_read_back':True}
+    def load_sources(self,frames):
+        return [self.write(self.settings.sources[kind],self.settings.source_version,frame,
+            f'F1 {kind} in the Pitlane event schema. Public OpenF1/Jolpica observations, 2023-2024; read-only dashboard source.') for kind,frame in frames.items()]
     def publish(self,prefix,frames):
-        validate_prefix(prefix);report=[]
-        for group,frame in frames.items():
-            name=prefix+'_'+group
-            fg=self.store.get_or_create_feature_group(name=name,version=1,primary_key=['id'],online_enabled=False,
-                description='Exploratory 2024 Dutch GP features. Public OpenF1 observations; batch demo, not live production features.')
-            fg.insert(frame,write_options={'wait_for_job':True})
-            read=fg.read()
-            if not set(frame.id.astype(str)).issubset(set(read.id.astype(str))):raise RuntimeError(f'Feature Group read-back incomplete: {name}')
-            report.append({'feature_group':name,'version':1,'published_rows':len(frame),'read_rows':len(read),'id_read_back':True})
-        return report
+        validate_prefix(prefix)
+        return [self.write(prefix+'_'+group,1,frame,'Exploratory 2024 Dutch GP features. Public OpenF1 observations; batch demo, not live production features.') for group,frame in frames.items()]

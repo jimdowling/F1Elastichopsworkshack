@@ -135,7 +135,7 @@ manifest=dict(dataset='2024 Dutch Grand Prix · Race',circuit='Zandvoort',date='
  'Tyre age and pit-in flags are derived from real stint/pit records. Track eligibility is conservatively derived from race-control flags, not FastF1 TrackStatus. Sector-sum consistency is our quality check, not FastF1 IsAccurate.',
  'Distance is approximated by integrating measured speed. Telemetry and positions are interpolated for visualization.',
  'Pitwall outcomes are illustrative model outputs, not observed alternatives or validated causal predictions.',
- 'Local SQLite search/feature tables stand in for Elastic/Hopsworks. Neither cloud platform is connected.',
+ 'Local SQLite feature tables stand in for Hopsworks. The original labs are not connected to Hopsworks.',
  'Different fastest laps have different tyre/fuel/traffic conditions. Driver DNA identifies same-race driver-car signatures, not intrinsic driving style.'])
 manifest['sha256']={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in DATA.glob('*.json') if p.name!='manifest.json'}
 dump('manifest.json',manifest)

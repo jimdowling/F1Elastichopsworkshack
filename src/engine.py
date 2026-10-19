@@ -1,6 +1,5 @@
 """Real-data, deterministic local pipelines for four exploratory F1 applications.
-SQLite is explicitly the local search/feature-store substitute, not Elasticsearch
-or Hopsworks. All models consume a verified read-back from the feature tables.
+SQLite is explicitly the local feature-store substitute, not Hopsworks. All models consume a verified read-back from the feature tables.
 """
 from pathlib import Path
 from datetime import datetime, timezone
@@ -262,7 +261,7 @@ class LabEngine:
 
     def pipeline_status(self):
         return safe(dict(status='ready',built_at=self.built_at,duration_seconds=getattr(self,'duration',0),steps=self.steps,
-          search_backend='SQLite · local Elastic substitute',feature_backend='SQLite · local Hopsworks substitute',cloud_connected=False,
+          search_backend='SQLite · local query tables',feature_backend='SQLite · local Hopsworks substitute',cloud_connected=False,
           groups=[{'name':n,'rows':len(f),'version':1,'primary_key':'id','read_back':True} for n,f in [('ghost_features',self.ghost_features),('pace_features',self.pace),('dna_features',self.dna),('strategy_features',self.store.read('strategy_features'))]]))
 
     def bootstrap(self):

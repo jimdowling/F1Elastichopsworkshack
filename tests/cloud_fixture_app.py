@@ -9,13 +9,12 @@ ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT));sys.path.i
 from app import app
 from src import connections
 from src.settings import Settings
-from src.remote import ElasticReader,HopsFeatures
-from cloud_fixtures import FixtureHTTP,FixtureHops
+from cloud_fixtures import FixtureHops
 from fastapi.responses import JSONResponse
 from fastapi import Request,HTTPException
-http=FixtureHTTP();sdk=FixtureHops()
-settings=Settings.from_mapping({'ELASTIC_SOURCE_URL':'https://fixture.invalid','ELASTIC_SOURCE_API_KEY':'OFFLINE_FIXTURE_KEY','HOPSWORKS_HOST':'fixture.invalid','HOPSWORKS_PROJECT':'OFFLINE_FIXTURE','HOPSWORKS_API_KEY':'OFFLINE_FIXTURE_KEY','PITLANE_ADMIN_TOKEN':'operator_test_token_only_32_characters','PITLANE_FEATURE_PREFIX':'pitlane_testteam','PITLANE_ALLOW_FEATURE_WRITES':'true','PITLANE_PAGE_SIZE':'100'})
-connections.RUNTIME=connections.Runtime(settings,elastic_factory=lambda s:ElasticReader(s,http),hops_factory=lambda s:HopsFeatures(s,sdk))
+sdk=FixtureHops()
+settings=Settings.from_mapping({'HOPSWORKS_HOST':'fixture.invalid','HOPSWORKS_PROJECT':'OFFLINE_FIXTURE','HOPSWORKS_API_KEY':'OFFLINE_FIXTURE_KEY','PITLANE_ADMIN_TOKEN':'operator_test_token_only_32_characters','PITLANE_FEATURE_PREFIX':'pitlane_testteam','PITLANE_ALLOW_FEATURE_WRITES':'true'})
+connections.RUNTIME=connections.Runtime(settings,client=sdk)
 
 @app.middleware('http')
 async def mark_offline_fixture(request,call_next):
@@ -27,13 +26,13 @@ async def mark_offline_fixture(request,call_next):
 
 @app.post('/_qa/reset')
 def reset_fixture(request:Request):
-    global http,sdk
+    global sdk
     if request.headers.get('X-Pitlane-Test-Token')!='offline-fixture-only':raise HTTPException(403)
     old=connections.RUNTIME
     if old.job and old.job['state'] in {'queued','running'}:raise HTTPException(409)
     old.pool.shutdown(wait=True)
-    http=FixtureHTTP();sdk=FixtureHops()
-    connections.RUNTIME=connections.Runtime(settings,elastic_factory=lambda s:ElasticReader(s,http),hops_factory=lambda s:HopsFeatures(s,sdk))
+    sdk=FixtureHops()
+    connections.RUNTIME=connections.Runtime(settings,client=sdk)
     return {'reset':True,'offline_fixture':True}
 # The production static-file mount is terminal; put the QA-only reset before it.
 app.router.routes.insert(0,app.router.routes.pop())
