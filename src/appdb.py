@@ -7,7 +7,8 @@ CREATE TABLE; that grants the app the table, prefixes it with app.table_prefix
 (app_<app name>__) and drops it when the app is deleted. Apps created before table registration
 (managed_db False) keep the unprefixed app_pitlane_* names and need a Data Owner start.
 
-Outside a Hopsworks pod (no MYSQL_HOST) the same interface is kept in process memory.
+Outside a Hopsworks pod (no MYSQL_HOST) the same interface is kept in process memory. Inside one, a
+failure to reach RonDB fails the start instead: state silently kept in memory is lost on restart.
 
 Tables (logical name -> <prefix><name>)
   race_pace     per-driver race-pace features computed by the dashboard
@@ -44,21 +45,19 @@ def table_names():
     """Register the app's tables and return {logical name: SQL name}.
 
     The app is looked up by its job name (HOPSWORKS_JOB_NAME, set in the app pod; PITLANE_APP_NAME overrides).
-    register_table is idempotent, so this runs on every start. A hopsworks client older than table
-    registration (no App.register_table) gets the same calls through the REST API it wraps.
+    register_table is idempotent, so this runs on every start.
     """
     import hopsworks
-    from hopsworks_common import client
-    hopsworks.login(engine='python')
+    project = hopsworks.login(engine='python')
     app_name = os.environ.get('PITLANE_APP_NAME') or os.environ['HOPSWORKS_JOB_NAME']
-    c = client._get_instance(); path = ['project', c._project_id, 'apps', app_name]
-    app = c._send_request('GET', path)
-    if not app.get('managedDb'):
+    app = project.get_app_api().get_app(app_name)
+    if not hasattr(app, 'register_table'):
+        raise RuntimeError('The hopsworks client in this environment predates App.register_table; '
+                           'install a client with app table registration in the app environment')
+    if not app.managed_db:
         log.warning('App %s predates table registration; using unprefixed app_pitlane_* tables (needs a Data Owner start)', app_name)
         return {t: f'app_pitlane_{t}' for t in TABLES}
-    prefix = app['tablePrefix']
-    return {t: c._send_request('POST', path + ['tables'], headers={'content-type': 'application/json'},
-                               data=json.dumps({'name': prefix + t}))['name'] for t in TABLES}
+    return {t: app.register_table(t) for t in TABLES}
 
 
 def pack(value): return zlib.compress(json.dumps(value, separators=(',', ':'), allow_nan=False).encode(), 6)
@@ -133,12 +132,7 @@ class AppStore:
 
     def __init__(self, backend=None):
         if backend is None:
-            if 'MYSQL_HOST' in os.environ:
-                try: backend = RonDBBackend()
-                except Exception as e:
-                    log.error('RonDB unavailable (%s); app tables fall back to process memory.', e)
-                    backend = MemoryBackend(); backend.name = f'process memory (RonDB unavailable: {type(e).__name__})'
-            else: backend = MemoryBackend()
+            backend = RonDBBackend() if 'MYSQL_HOST' in os.environ else MemoryBackend()
         self.backend = backend; self.lock = RLock()
 
     @property
