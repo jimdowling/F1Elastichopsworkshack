@@ -70,14 +70,18 @@ class HopsData:
     """One Hopsworks login and feature-store handle; all reads go through the Query Service."""
 
     def __init__(self):
-        self.lock = RLock(); self.fs = None; self.groups = {}; self.reads = []
+        self.lock = RLock(); self.fs = None; self._project = None; self.groups = {}; self.reads = []
+
+    def project(self):
+        with self.lock:
+            if self._project is None:
+                import hopsworks
+                self._project = hopsworks.login(engine='python')  # in a Hopsworks pod: JWT, no host/key needed
+            return self._project
 
     def store(self):
         with self.lock:
-            if self.fs is None:
-                import hopsworks
-                project = hopsworks.login(engine='python')  # in a Hopsworks pod: JWT, no host/key needed
-                self.fs = project.get_feature_store(FEATURE_STORE)
+            if self.fs is None: self.fs = self.project().get_feature_store(FEATURE_STORE)
             return self.fs
 
     def group(self, name):

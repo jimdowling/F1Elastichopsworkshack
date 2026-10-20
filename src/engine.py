@@ -13,10 +13,13 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.utils.class_weight import compute_sample_weight
+from xgboost import XGBRegressor, XGBClassifier
+import threading
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matrix
 from .hopsdata import records, FEATURE_STORE
+from .registry import models as model_store
 
 log=logging.getLogger('pitlane.engine')
 LAB_DRIVERS=4
@@ -58,6 +61,11 @@ def make_pace_features(laps,cuts):
                      'split':'train' if r['lap_number']<=cuts[0] else 'validation' if r['lap_number']<=cuts[1] else 'test'})
             hist.append(r);last=r
     return pd.DataFrame(features)
+
+
+def digest(frame,cols):
+    """Fingerprint of a model's training data: a registered model is reused only for identical data."""
+    return hashlib.sha256(frame[cols].to_csv(index=False,float_format='%.9g').encode()).hexdigest()
 
 
 def eligible(r):
@@ -158,7 +166,7 @@ class LabEngine:
         # Chronological splits as fractions of race distance (72 laps -> 43/57 as in the original Dutch GP lab).
         self.pace_cuts=(int(L*.6),int(L*.8));self.dna_cuts=(int(L*.7),int(L*.8));self.window=(max(2,int(L*.17)),int(L*.79))
         for col in ['lap_duration_s','tyre_life','sector1_s','sector2_s','sector3_s','lap_start_s','lap_end_s']:self.laps[col]=pd.to_numeric(self.laps[col],errors='coerce')
-        self.steps=[];self.built_at=now();self.rebuild()
+        self.steps=[];self.built_at=now();self.model_sources={};self.pending=[];self.force_train=False;self.rebuild()
 
     def step(self,name,count,start,detail):
         self.steps.append(dict(name=name,rows=int(count),seconds=round(time.perf_counter()-start,3),status='complete',detail=detail))
@@ -184,24 +192,65 @@ class LabEngine:
         assert (self.pace.history_max_lap<self.pace.lap_number).all()
         self.step('Engineer & read back pace features',len(self.pace),t,'Past-only rolling windows; persisted feature-table round trip')
         t=time.perf_counter();self.fit_pace()
-        self.step('Train & evaluate pace model',self.pace_report['test_rows'],t,f'Chronological train ≤{self.pace_cuts[0]} / validation {self.pace_cuts[0]+1}–{self.pace_cuts[1]} / test ≥{self.pace_cuts[1]+1}')
+        self.step('Train & evaluate pace model',self.pace_report['test_rows'],t,self.source_note('pace')+f' · XGBoost · Chronological train ≤{self.pace_cuts[0]} / validation {self.pace_cuts[0]+1}–{self.pace_cuts[1]} / test ≥{self.pace_cuts[1]+1}')
         t=time.perf_counter();self.fit_strategy()
-        self.step('Calibrate strategy simulator',self.strategy_report['rows'],t,'Ridge-calibrated pace assumptions; not a causal model')
+        self.step('Calibrate strategy simulator',self.strategy_report['rows'],t,self.source_note('strategy')+' · Ridge-calibrated pace assumptions; not a causal model')
         t=time.perf_counter();self.fit_dna()
-        self.step('Train & evaluate driver–car classifier',self.dna_report['test_rows'],t,'Telemetry-only features; whole-lap chronological holdout')
+        self.step('Train & evaluate driver–car classifier',self.dna_report['test_rows'],t,self.source_note('dna')+' · XGBoost · telemetry-only features; whole-lap chronological holdout')
         t=time.perf_counter();self.store.put_read(self.race_key,'pace_results',self.pace)
         self.step('Publish application results',len(self.pace),t,'Results in RonDB; all four experiences ready')
-        self.built_at=now();self.duration=round(time.perf_counter()-start,3)
+        self.built_at=now();self.duration=round(time.perf_counter()-start,3);self.force_train=False
+        self.register_pending()
         return self.pipeline_status()
+
+    def model(self,kind,training_digest,train):
+        """This race's model from the Model Registry when one matches, else train() it and queue registration."""
+        name=f'pitlane_{kind}_{self.season}_{self.round:02d}'
+        if not self.force_train:
+            found=model_store().load(name,training_digest)
+            if found:
+                self.model_sources[kind]={'name':name,'version':found[1],'source':'downloaded from the Model Registry'};return found[0]
+        obj=train();self.pending.append((kind,name,obj,training_digest))
+        self.model_sources[kind]={'name':name,'version':None,'source':'trained in the app; registering in the Model Registry'}
+        return obj
+
+    def source_note(self,kind):
+        m=self.model_sources.get(kind,{});return f"{m.get('name')} v{m['version']} downloaded from the Model Registry" if m.get('version') else 'Trained now; registering in the Model Registry'
+
+    def retrain(self):
+        """Explicit re-run: train fresh models and register them as new versions."""
+        self.force_train=True;return self.rebuild()
+
+    def register_pending(self):
+        """Upload newly trained models in the background so requests don't wait on the registry."""
+        pending,self.pending=self.pending,[]
+        if not pending:return
+        metrics={'pace':lambda:{'model_mae':self.pace_report['model_mae'],'baseline_mae':self.pace_report['baseline_mae'],'validation_mae':self.pace_report['validation_mae']},
+                 'dna':lambda:{'accuracy':self.dna_report['accuracy'],'chance_accuracy':self.dna_report['chance_accuracy']},
+                 'strategy':lambda:{'age_coefficient':self.age_coefficient,'fuel_coefficient':self.fuel_coefficient,'pit_loss':self.pit_loss}}
+        about={'pace':'XGBoost lap-time regressor (Pace Detective)','dna':'XGBoost driver-car classifier (Driver DNA)','strategy':'Ridge pace calibration for the Pitwall simulator'}
+        jobs=[(kind,name,obj,d,metrics[kind](),f"{about[kind]} for {self.manifest['dataset']}; trained on RonDB feature tables built from the Hopsworks F1 feature groups.") for kind,name,obj,d in pending]
+        def run():
+            for kind,name,obj,d,m,text in jobs:
+                try:
+                    version=model_store().save(name,obj,d,m,text)
+                    self.model_sources[kind]={'name':name,'version':version,'source':'trained in the app; registered in the Model Registry'}
+                    log.info('Registered %s v%s',name,version)
+                except Exception as e:
+                    self.model_sources[kind]={'name':name,'version':None,'source':f'trained in the app; registration failed ({type(e).__name__})'}
+                    log.exception('Could not register %s',name)
+        threading.Thread(target=run,daemon=True).start()
 
     def fit_pace(self):
         p=self.pace
         numeric=['lap_number','tyre_life','rolling_median','rolling_mean','rolling_std','previous_lap_s']
         cats=['driver_code','compound'];self.pace_inputs=numeric+cats
         pre=ColumnTransformer([('numeric','passthrough',numeric),('category',OneHotEncoder(handle_unknown='ignore',sparse_output=False),cats)])
-        self.pace_model=Pipeline([('features',pre),('model',RandomForestRegressor(n_estimators=180,max_depth=9,min_samples_leaf=3,max_features=.85,random_state=42,n_jobs=1))])
         train=p.split=='train';valid=p.split=='validation';test=p.split=='test'
-        self.pace_model.fit(p.loc[train,self.pace_inputs],p.loc[train,'lap_duration_s'])
+        def fit():
+            m=Pipeline([('features',pre),('model',XGBRegressor(n_estimators=300,max_depth=4,learning_rate=.05,subsample=.9,colsample_bytree=.9,min_child_weight=3,random_state=42,n_jobs=1))])
+            return m.fit(p.loc[train,self.pace_inputs],p.loc[train,'lap_duration_s'])
+        self.pace_model=self.model('pace',digest(p[train],['id']+self.pace_inputs+['lap_duration_s']),fit);pre=self.pace_model.named_steps['features']
         p['baseline_prediction']=p.rolling_median
         p['model_prediction']=self.pace_model.predict(p[self.pace_inputs])
         p['baseline_residual']=p.lap_duration_s-p.baseline_prediction;p['model_residual']=p.lap_duration_s-p.model_prediction
@@ -221,8 +270,10 @@ class LabEngine:
         clean=self.laps[self.laps.apply(clean_lap,axis=1)].copy()
         cols=['id','driver_code','lap_number','tyre_life','compound','lap_duration_s']
         frame=self.store.put_read(self.race_key,'strategy_features',clean[cols])
-        pre=ColumnTransformer([('numeric','passthrough',['lap_number','tyre_life']),('category',OneHotEncoder(handle_unknown='ignore',sparse_output=False),['driver_code','compound'])])
-        model=Pipeline([('pre',pre),('ridge',Ridge(alpha=5.))]);model.fit(frame,frame.lap_duration_s)
+        def fit():
+            pre=ColumnTransformer([('numeric','passthrough',['lap_number','tyre_life']),('category',OneHotEncoder(handle_unknown='ignore',sparse_output=False),['driver_code','compound'])])
+            return Pipeline([('pre',pre),('ridge',Ridge(alpha=5.))]).fit(frame,frame.lap_duration_s)
+        model=self.model('strategy',digest(frame,cols),fit);pre=model.named_steps['pre']
         coefs=dict(zip(pre.get_feature_names_out(),model.named_steps['ridge'].coef_))
         raw_age=float(coefs['numeric__tyre_life']);raw_fuel=float(coefs['numeric__lap_number'])
         self.age_coefficient=float(np.clip(raw_age,.002,.16));self.fuel_coefficient=float(np.clip(raw_fuel,-.12,.03))
@@ -296,9 +347,14 @@ class LabEngine:
         self.dna=self.store.put_read(self.race_key,'dna_features',frame)
         a,b=self.dna_cuts;train=self.dna.lap_number<=a;valid=(self.dna.lap_number>a)&(self.dna.lap_number<=b);test=self.dna.lap_number>b
         if not test.any() or self.dna.loc[train,'driver'].nunique()<2:raise ValueError('Not enough held-out telemetry laps in this race for Driver DNA.')
-        self.dna_model=RandomForestClassifier(n_estimators=220,max_depth=8,min_samples_leaf=2,max_features=.8,class_weight='balanced',random_state=42,n_jobs=1)
-        self.dna_model.fit(self.dna.loc[train,DNA_FEATURES],self.dna.loc[train,'driver'])
-        predictions=self.dna_model.predict(self.dna.loc[test,DNA_FEATURES]);classes=self.drivers
+        def fit():
+            X=self.dna.loc[train,DNA_FEATURES];y=self.dna.loc[train,'driver'];labels=sorted(y.unique())
+            clf=XGBClassifier(n_estimators=300,max_depth=4,learning_rate=.08,subsample=.9,colsample_bytree=.8,random_state=42,n_jobs=1,eval_metric='mlogloss')
+            clf.fit(X,y.map({c:i for i,c in enumerate(labels)}),sample_weight=compute_sample_weight('balanced',y))
+            return {'model':clf,'classes':labels}  # XGBoost needs integer labels; keep the driver codes alongside
+        bundle=self.model('dna',digest(self.dna[train],['id','driver']+DNA_FEATURES),fit)
+        self.dna_model=bundle['model'];self.dna_classes=bundle['classes']
+        predictions=np.array(self.dna_classes)[self.dna_model.predict(self.dna.loc[test,DNA_FEATURES]).astype(int)];classes=self.drivers
         self.challenge_ids=self.dna.loc[test,'id'].tolist();np.random.default_rng(42).shuffle(self.challenge_ids)
         self.dna_map={x['id']:x for x in self.dna_raw}
         self.radar_low=self.dna.loc[train,RADAR_FEATURES].quantile(.01);self.radar_high=self.dna.loc[train,RADAR_FEATURES].quantile(.99)
@@ -308,7 +364,7 @@ class LabEngine:
           importance=[{'name':FEATURE_LABELS[k],'key':k,'value':float(v)} for k,v in sorted(zip(DNA_FEATURES,self.dna_model.feature_importances_),key=lambda x:-x[1])],
           archetypes={d:self.radar_values(g[RADAR_FEATURES].median()) for d,g in self.dna.loc[train].groupby('driver')},
           radar_labels=[FEATURE_LABELS[k] for k in RADAR_FEATURES],
-          note=f'Identifies {len(classes)} same-race driver–car combinations. Car, tyres, DRS, and track conditions confound style. Votes are not calibrated probabilities.'))
+          note=f'XGBoost classifier. Identifies {len(classes)} same-race driver–car combinations. Car, tyres, DRS, and track conditions confound style. Votes are not calibrated probabilities.'))
 
     def radar_values(self,features):
         return [float(np.clip((features[k]-self.radar_low[k])/max(self.radar_high[k]-self.radar_low[k],1e-8),0,1)) for k in RADAR_FEATURES]
@@ -322,7 +378,7 @@ class LabEngine:
         if cid not in self.challenge_ids:raise ValueError('Not a held-out challenge')
         row=self.dna[self.dna.id==cid];r=self.dna_map[cid]
         probabilities=self.dna_model.predict_proba(row[DNA_FEATURES])[0]
-        votes=sorted([{'driver':str(c),'vote':float(p)} for c,p in zip(self.dna_model.classes_,probabilities)],key=lambda x:-x['vote'])
+        votes=sorted([{'driver':str(c),'vote':float(p)} for c,p in zip(self.dna_classes,probabilities)],key=lambda x:-x['vote'])
         return safe(dict(id=cid,actual=r['driver'],model_guess=votes[0]['driver'],model_correct=votes[0]['driver']==r['driver'],
           guess=guess,correct=guess==r['driver'] if guess else None,votes=votes,lap_number=r['lap_number'],lap_time=r['lap_time'],compound=r['compound'],tyre_life=r['tyre_life'],
           features=[{'name':FEATURE_LABELS[k],'value':r['features'][k],'key':k} for k in DNA_FEATURES]))
@@ -350,7 +406,7 @@ class LabEngine:
 
     def pipeline_status(self):
         return safe(dict(status='ready',built_at=self.built_at,duration_seconds=getattr(self,'duration',0),steps=self.steps,
-          search_backend=f'Hopsworks Query Service · {FEATURE_STORE}',feature_backend=self.store.name,cloud_connected=True,race_key=self.race_key,
+          search_backend=f'Hopsworks Query Service · {FEATURE_STORE}',feature_backend=self.store.name,cloud_connected=True,race_key=self.race_key,models=self.model_sources,
           groups=[{'name':n,'rows':int(c),'version':1,'primary_key':'id','read_back':True} for n,c in sorted(self.store.counts(self.race_key).items()) if n!='race_laps']))
 
     def bootstrap(self):

@@ -15,6 +15,18 @@ from src.dashboard_api import get_dashboard
 from src.engine import lab as get_lab, make_pace_features, DNA_FEATURES
 
 
+class MemoryModels:
+    """Stand-in Model Registry so test runs don't upload model versions."""
+    def __init__(self): self.saved = {}
+    def load(self, name, digest):
+        v = self.saved.get(name); return (v[0], len(self.saved)) if v and v[1] == digest else None
+    def save(self, name, obj, digest, metrics, text): self.saved[name] = (obj, digest); return 1
+
+
+import src.engine as engine_module
+engine_module.model_store = (lambda store=MemoryModels(): store)
+
+
 @pytest.fixture(scope='session')
 def db(): return get_dashboard()
 
@@ -117,6 +129,18 @@ def test_strategy_anchor_and_dna_holdout(lab):
     m = np.array(lab.dna_report['confusion']); assert abs(np.trace(m) / m.sum() - lab.dna_report['accuracy']) < 1e-6
     assert lab.dna[lab.dna.id.isin(lab.challenge_ids)].lap_number.min() > lab.dna_cuts[1]
     assert not {'id', 'driver', 'lap_number'} & set(DNA_FEATURES)
+
+
+def test_models_are_xgboost_and_reused_from_the_registry(lab):
+    import time
+    from src.engine import LabEngine
+    from src.hopsdata import archive, hops
+    from src.appdb import store
+    assert type(lab.pace_model.named_steps['model']).__name__ == 'XGBRegressor' and type(lab.dna_model).__name__ == 'XGBClassifier'
+    time.sleep(2)  # background registration
+    again = LabEngine(2024, 15, archive(), hops(), store())
+    assert {m['source'] for m in again.model_sources.values()} == {'downloaded from the Model Registry'}
+    assert again.pace_report == lab.pace_report and again.dna_report['accuracy'] == lab.dna_report['accuracy']
 
 
 def test_lab_works_for_another_race():

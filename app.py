@@ -110,7 +110,7 @@ def pipeline(season: int = Season, round: int = Round): return lab(season, round
 
 
 @app.post('/api/pipeline')
-def rerun(season: int = Season, round: int = Round): return run(lab(season, round).rebuild)
+def rerun(season: int = Season, round: int = Round): return run(lab(season, round).retrain)
 
 
 @app.get('/api/features/{group}.csv')
