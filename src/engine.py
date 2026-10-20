@@ -2,7 +2,7 @@
 
 Inputs (laps, results, telemetry signatures, ghost-lap traces) are built from the shared
 feature groups through the Hopsworks Query Service and cached in RonDB; every feature table
-the models consume is written to RonDB (app_pitlane_lab_features) and read back first.
+the models consume is written to RonDB (app_pitlane__lab_features) and read back first.
 """
 from datetime import datetime, timezone
 from threading import RLock
@@ -154,7 +154,7 @@ def build_lab_inputs(arch,data,season,rnd):
       'Tyre age and pit-in flags are derived from stint/pit records. Track eligibility is conservatively derived from race-control flags. Sector-sum consistency is the lap-accuracy check.',
       'Distance is approximated by integrating measured speed. Telemetry and positions are interpolated for visualization.',
       'Pitwall outcomes are illustrative model outputs, not observed alternatives or validated causal predictions.',
-      'Feature tables are written to and read back from RonDB (app_pitlane_lab_features) before the models consume them.',
+      'Feature tables are written to and read back from RonDB (app_pitlane__lab_features) before the models consume them.',
       'Different fastest laps have different tyre/fuel/traffic conditions. Driver DNA identifies same-race driver-car signatures, not intrinsic driving style.'])
     return safe(dict(manifest=manifest,results=results,laps=rows,ghosts={c:ghosts[c] for c in selected},dna=[x for x in dna if x['driver'] in selected],classified_times=classified,selected=selected))
 

@@ -11,16 +11,16 @@ An explorable 2023–2024 Formula 1 race workspace and four ML/3D experiments, r
            Hopsworks Python client             │  fg.select(...).filter(...).read()
            (Hopsworks Query Service) ◀─────────┤  shared feature store: hopsworks_default_featurestore
                                                │  f1_races, f1_race_results, f1_laps, f1_stints, f1_car_telemetry, ...
-           RonDB (project database) ◀──────────┘  app_pitlane_race_pace, app_pitlane_lab_features, app_pitlane_cache
+           RonDB (project database) ◀──────────┘  app_pitlane__race_pace, app_pitlane__lab_features, app_pitlane__cache
 ```
 
 - **Reads** go through the Hopsworks Python client, so `fg.read()` is served by the **Hopsworks Query Service** with the filter pushed down. Trino is not used. At startup the app loads the archive with 16 bounded reads (calendar, classifications, standings, pit stops, and race sessions for laps, stints, positions, weather and race control). This takes about 30 s. High-frequency `f1_car_telemetry` / `f1_car_location` (about 100M rows each) are read on demand for **one race session and an explicit set of drivers**.
 - **App state** lives in RonDB tables in the project database, through the `MYSQL_*` variables Hopsworks injects into the app pod (`src/appdb.py`):
-  - `app_pitlane_race_pace`: per-driver race-pace features computed by the dashboard. They are written and then read back.
-  - `app_pitlane_lab_features`: the experiment feature tables (ghost/pace/dna/strategy/...) per race. They are written and read back before the models consume them.
-  - `app_pitlane_cache`: derived per-race payloads (lab telemetry signatures, multi-car replay series), compressed.
+  - `app_pitlane__race_pace`: per-driver race-pace features computed by the dashboard. They are written and then read back.
+  - `app_pitlane__lab_features`: the experiment feature tables (ghost/pace/dna/strategy/...) per race. They are written and read back before the models consume them.
+  - `app_pitlane__cache`: derived per-race payloads (lab telemetry signatures, multi-car replay series), compressed.
 
-  Creating these tables needs the app to be **started by a Data Owner**. Outside a Hopsworks pod (no `MYSQL_HOST`) the same interface is kept in process memory.
+  The app registers each table with `app.register_table()` before its `CREATE TABLE` (the app's own database user may only create registered tables), so any project member can start it. The names carry the app's `table_prefix` (`app_pitlane__` for an app named `pitlane`), and deleting the app drops them. Outside a Hopsworks pod (no `MYSQL_HOST`) the same interface is kept in process memory.
 - **The experiments are fitted per race.** The race is the season/GP chosen in the dashboard scope bar. The lab drivers are the top four finishers with enough green-flag laps and telemetry. Chronological splits are fractions of race distance, so the 72-lap Dutch GP keeps the original 43/57 cut-offs and reproduces the original snapshot exactly: 1,425 laps, 275 telemetry signatures and the same model metrics.
 
 | Feature group(s) | Used for |
