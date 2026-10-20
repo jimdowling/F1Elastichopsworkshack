@@ -1,17 +1,14 @@
-"""Historical dashboard: real public observations, transparent aggregations.
+"""Historical dashboard over the Hopsworks F1 feature groups: transparent aggregations.
 
-The published hackathon dimensions (season/round/session/driver) are retained.
-No live timing or cloud connection is implied. Classification records and
-on-demand pace features make a verified local SQLite round trip.
+The archive (calendar, classifications, race sessions) is read from the shared
+feature groups through the Hopsworks Query Service (see hopsdata.py). On-demand
+race-pace features are written to and read back from RonDB (app_pitlane_race_pace).
 """
-from pathlib import Path
 from functools import lru_cache
 from collections import defaultdict,Counter
 from threading import RLock
-import json,sqlite3,hashlib,statistics,csv,io,math
+import json,statistics,csv,io,math
 import numpy as np
-
-ROOT=Path(__file__).resolve().parents[1];DASH=ROOT/'data/dashboard'
 TEAM_COLORS={'red_bull':'#7ca7ff','mercedes':'#58d8c4','ferrari':'#ff677a','mclaren':'#ff9e65','aston_martin':'#64bd9c','alpine':'#be9aff','williams':'#78b2ff','haas':'#b8c3cf','alphatauri':'#a6acdf','rb':'#a6acdf','alfa':'#d2829b','sauber':'#a4db70'}
 NO_START={'Did not start','Withdrew','Did not qualify','Did not prequalify','Excluded'}
 
@@ -19,23 +16,15 @@ def finished(row):return (row.get('status') or '').strip().casefold() in {'finis
 def started(row):return row.get('status') not in NO_START and bool((row.get('laps') or 0)>0 or (row.get('grid_position') or 0)>0)
 def mean(v):return round(float(np.mean(v)),6) if v else None
 def quant(v,p):return round(float(np.quantile(v,p)),6) if v else None
-def read(path):return json.loads(Path(path).read_text())
 def finite(v):return v is not None and isinstance(v,(int,float)) and math.isfinite(v)
 
 class DashboardEngine:
-    def __init__(self,path=DASH,runtime_path=None,catalog=None,feature_reader=None):
-        self.path=Path(path);self.catalog=catalog if catalog is not None else read(self.path/'catalog.json');self.feature_reader=feature_reader;self.feature_source='SQLite';self.data_source='public'
-        self.manifest=read(self.path/'manifest.json') if (self.path/'manifest.json').exists() else {'coverage':[],'errors':[],'synthetic_observations':0,'status':'importing'}
+    def __init__(self,archive,store):
+        self.archive=archive;self.store=store;self.catalog=archive.catalog;self.feature_source=f'RonDB · {store.name}';self.data_source='feature-groups'
+        self.manifest=archive.manifest
         self.events=self.catalog['events'];self.drivers={d['driver_id']:d for d in self.catalog['drivers']};self.teams={t['team_id']:{**t,'color':TEAM_COLORS.get(t['team_id'],'#b3bfcc')} for t in self.catalog['teams']}
         self.event_map={(e['season'],e['round_number']):e for e in self.events};self.lock=RLock()
-        runtime=Path(runtime_path) if runtime_path is not None else ROOT/'.cache/dashboard-runtime.sqlite';runtime.parent.mkdir(parents=True,exist_ok=True)
-        self.db=sqlite3.connect(runtime,check_same_thread=False)
-        self.db.execute('CREATE TABLE IF NOT EXISTS dashboard_results (id TEXT PRIMARY KEY, season INTEGER, round_number INTEGER, session_name TEXT, payload TEXT)')
-        self.db.execute('CREATE TABLE IF NOT EXISTS race_pace_features (id TEXT PRIMARY KEY, season INTEGER, round_number INTEGER, payload TEXT)')
-        self.db.execute('DELETE FROM dashboard_results');self.db.execute('DELETE FROM race_pace_features')
-        self.db.executemany('INSERT INTO dashboard_results VALUES (?,?,?,?,?)',[(r['id'],r['season'],r['round_number'],r['session_name'],json.dumps(r,separators=(',',':'))) for r in self.catalog['results']]);self.db.commit()
-        self.results=[json.loads(r[0]) for r in self.db.execute('SELECT payload FROM dashboard_results ORDER BY season,round_number,session_name,id')]
-        if len(self.results)!=len(self.catalog['results']):raise RuntimeError('Classification read-back count mismatch')
+        self.results=sorted(self.catalog['results'],key=lambda r:(r['season'],r['round_number'],r['session_name'],r['id']))
         self.pits=self.catalog['pit_stops'];self.sessions=self.catalog['sessions'];self.official=self.catalog['official_standings']
 
     def event(self,season,round_number):
@@ -62,7 +51,7 @@ class DashboardEngine:
     def catalog_view(self):
         return {'seasons':self.catalog['seasons'],'events':self.events,'drivers':list(self.drivers.values()),'teams':list(self.teams.values()),
             'counts':{'events':len(self.events),'classifications':len(self.results),'pit_records':len(self.pits),'sessions':len(self.sessions),'laps':self.manifest.get('lap_rows',0)},
-            'backend':'Local SQLite read-back + public historical JSON archive','cloud_connected':False,'synthetic_observations':0}
+            'backend':f"Hopsworks feature groups ({self.manifest['feature_store']}) via the Hopsworks Query Service; pace features in {self.store.name}",'cloud_connected':True,'synthetic_observations':0}
 
     def _standings(self,season,through,kind):
         entries=self.rows(season,through);points=defaultdict(float);counts=defaultdict(Counter);last={}
@@ -137,9 +126,9 @@ class DashboardEngine:
 
     @lru_cache(maxsize=8)
     def race_raw(self,season,round_number):
-        self.event(season,round_number);p=self.path/f'race_{season}_{round_number:02d}.json'
-        if not p.exists():return {'event':self.event(season,round_number),'laps':[],'stints':[],'positions':[],'weather':[],'race_control':[],'coverage_note':'Detailed session observations are not loaded.'}
-        return read(p)
+        event=self.event(season,round_number);raw=self.archive.races.get((season,round_number))
+        if raw is None:return {'event':event,'laps':[],'stints':[],'positions':[],'weather':[],'race_control':[],'coverage_note':'No Race session for this event in f1_sessions.'}
+        return raw
 
     def compute_pace_rows(self,season,round_number,clean=True,cutoff=1.07):
         if not finite(cutoff) or not 1<=cutoff<=1.5:raise ValueError('Pace cutoff must be finite and between 1.0 and 1.5')
@@ -161,20 +150,11 @@ class DashboardEngine:
                 'reference_median_s':None if reference is None else reference/1000,'cutoff':cutoff,'pit_outlier_filter':bool(clean)})
         return out,accepted
 
-    def pace_source_id(self,season,round_number):
-        rows=self.race_raw(season,round_number)['laps']
-        raw=json.dumps({'source':self.data_source,'laps':rows},sort_keys=True,separators=(',',':'),allow_nan=False)
-        return hashlib.sha256(raw.encode()).hexdigest()
-
     def pace_rows(self,season,round_number,clean=True,cutoff=1.07):
         out,accepted=self.compute_pace_rows(season,round_number,clean,cutoff)
-        if self.feature_reader:
-            readback=self.feature_reader(self.pace_source_id(season,round_number),out)
-        else:
-            with self.lock:
-                self.db.executemany('INSERT OR REPLACE INTO race_pace_features VALUES (?,?,?,?)',[(r['id'],season,round_number,json.dumps(r,separators=(',',':'))) for r in out]);self.db.commit()
-                fetched={r['id']:r for r in [json.loads(x[0]) for x in self.db.execute('SELECT payload FROM race_pace_features WHERE season=? AND round_number=?',(season,round_number))]}
-            readback=[fetched[r['id']] for r in out]
+        # Write the computed features to RonDB and consume the read-back rows.
+        fetched={r['id']:r for r in self.store.put_pace(season,round_number,out)}
+        readback=[fetched[r['id']] for r in out]
         readback.sort(key=lambda r:r['median_s'])
         if readback:
             best=readback[0]['median_s']
@@ -258,8 +238,8 @@ class DashboardEngine:
         self.event(season,round_number)
         if session=='Race':rows=self.race_raw(season,round_number).get('weather',[])
         else:
-            p=self.path/f'weather_{season}_{round_number:02d}_qualifying.json';rows=read(p) if p.exists() else []
-        return {'season':season,'round_number':round_number,'session_name':session,'rows':rows,'summary':{k:mean([r[k] for r in rows if finite(r.get(k))]) for k in ['air_temperature','track_temperature','humidity','pressure','wind_speed']},'rain_samples':sum(bool(r.get('rainfall')) for r in rows),'source':'OpenF1; full-session samples, including pre/post-race where supplied'}
+            rows=self.archive.qualifying_weather.get((season,round_number),[])
+        return {'season':season,'round_number':round_number,'session_name':session,'rows':rows,'summary':{k:mean([r[k] for r in rows if finite(r.get(k))]) for k in ['air_temperature','track_temperature','humidity','pressure','wind_speed']},'rain_samples':sum(bool(r.get('rainfall')) for r in rows),'source':'f1_weather; full-session samples, including pre/post-race where supplied'}
 
     @lru_cache(maxsize=2)
     def tracks(self,season):
@@ -295,15 +275,14 @@ class DashboardEngine:
         return out
 
     def coverage_view(self):
-        with self.lock:feature_count=self.db.execute('SELECT COUNT(*) FROM race_pace_features').fetchone()[0]
         return {'manifest':self.manifest,'quality':self.archive_quality(),'source_url':'https://api.jolpi.ca/ergast/f1/','reference_url':'https://app.formula1dashboard.com/',
-            'local_feature_rows':feature_count,'result_readback_rows':len(self.results),'models_scope':'The four existing ML/replay experiments use the separately validated 2024 Dutch GP snapshot, not a newly trained two-season model.',
+            'feature_backend':self.store.name,'local_feature_rows':self.store.pace_count(),'result_readback_rows':len(self.results),'models_scope':'The four experiments are fitted per selected race from the same feature groups (one race at a time), not a two-season model.',
             'schema_mapping':[
-                {'index':'f1-sessions','source':'Jolpica calendar + OpenF1 session metadata','supported':'season, round_number, country, location, event_name, session_name, session_date','note':'Public equivalents, not the event cluster.'},
-                {'index':'f1-results','source':'Jolpica classifications','supported':'driver, team, grid, classification, points, status, fastest_lap_ms, qualifying segments','note':'Sprint data supplements championship points; race/qualifying remain distinct.'},
-                {'index':'f1-laps','source':'OpenF1 laps + stints + position changes; Jolpica pit matching','supported':'lap_duration_ms, sector durations in ms, compound, tyre_life, pit flags, derived as-of position, speed traps','note':'track_status is null rather than falsely claimed to be native FastF1. Filtering is explicitly retrospective.'},
-                {'index':'f1-weather','source':'OpenF1 race/qualifying weather','supported':'session_time_s, temperatures, humidity, pressure, wind, rainfall','note':'Session-relative time; UTC date is retained.'},
-                {'index':'f1-telemetry','source':'Existing four Dutch-GP replay traces + 275 lap signatures','supported':'speed, RPM, throttle, brake, gear, measured XY on selected laps','note':'The schema export remains four comparison laps. A separate public Dutch GP replay includes the full field at reduced cadence; the 57-million-row event index has not been ingested.'}],
+                {'index':'f1-sessions','source':'f1_races + f1_circuits + f1_sessions','supported':'season, round_number, country, location, event_name, session_name, session_date','note':'Sessions are matched to rounds by date.'},
+                {'index':'f1-results','source':'f1_race_results, f1_qualifying_results, f1_sprint_results','supported':'driver, team, grid, classification, points, status, fastest_lap_ms, qualifying segments','note':'Sprint data supplements championship points; race/qualifying remain distinct.'},
+                {'index':'f1-laps','source':'f1_laps + f1_stints + f1_track_positions; f1_pit_stops pit matching','supported':'lap_duration_ms, sector durations in ms, compound, tyre_life, pit flags, derived as-of position, speed traps','note':'track_status is null in the dashboard; the experiments derive green-flag eligibility from f1_race_control.'},
+                {'index':'f1-weather','source':'f1_weather (race/qualifying sessions)','supported':'session_time_s, temperatures, humidity, pressure, wind, rainfall','note':'Session-relative time; UTC date is retained.'},
+                {'index':'f1-telemetry','source':'f1_car_telemetry + f1_car_location','supported':'speed, RPM, throttle, brake, gear, DRS, XY','note':'About 100M rows each; read on demand for one race session and a bounded set of drivers, never in bulk.'}],
             'replacements':[
                 {'reference':'Tech Updates','adapted':'Race Control','reason':'Recorded messages, flags and lap-deletion context replace unavailable upgrade reports.'},
                 {'reference':'Used Elements','adapted':'Tyre & Stint Explorer','reason':'Observed compounds and stint lengths replace unsupported power-unit allocations.'},

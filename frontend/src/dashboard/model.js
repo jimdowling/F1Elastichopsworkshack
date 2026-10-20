@@ -4,7 +4,7 @@ export const NAV_GROUPS=[
  {label:'RACE DESK',items:[['dashboard','Dashboard','LayoutDashboard'],['timing','Historical timing','Radio'],['calendar','Race calendar','CalendarDays'],['results','Session results','Flag']]},
  {label:'CHAMPIONSHIP',items:[['driver-standings','Driver standings','Trophy'],['constructor-standings','Constructor standings','Award'],['drivers','Drivers & profiles','ContactRound'],['teams','Teams','Users'],['driver-stats','Driver statistics','ChartNoAxesCombined']]},
  {label:'RACE INTELLIGENCE',items:[['head-to-head','Head to head','Swords'],['consistency','Consistency','Activity'],['race-pace','Race pace','Gauge'],['pit-stops','Pit-lane analysis','Timer'],['tyres','Tyres & stints','CircleDot'],['weather','Weather & conditions','CloudSun'],['race-control','Race control','Siren'],['track-dna','Track DNA','Route']]},
- {label:'DATA WORKBENCH',items:[['data','Coverage & schema','Database'],['connections','Connections','Database']]}
+ {label:'DATA WORKBENCH',items:[['data','Coverage & schema','Database']]}
 ];
 export const DASH_PAGES=NAV_GROUPS.flatMap(g=>g.items.map(x=>x[0]));
 export const PAGE_NAMES=Object.fromEntries(NAV_GROUPS.flatMap(g=>g.items.map(x=>[x[0],x[1]])));

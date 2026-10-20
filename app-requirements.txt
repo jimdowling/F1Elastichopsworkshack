@@ -1,0 +1,9 @@
+# Installed into the pitlane-app-env clone of python-agent-pipeline (Hopsworks app runtime).
+fastapi
+uvicorn
+pandas>=2.2
+numpy>=2
+scikit-learn>=1.6
+xgboost
+joblib
+matplotlib
