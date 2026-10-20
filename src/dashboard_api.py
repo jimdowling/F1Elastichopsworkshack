@@ -1,38 +1,30 @@
-"""Read-only historical dashboard endpoints and schema-aligned exports."""
-from functools import lru_cache
+"""Read-only historical dashboard endpoints and schema-aligned exports, over Hopsworks feature groups."""
 from threading import RLock
 from typing import Literal
 from fastapi import APIRouter,HTTPException,Query
 from fastapi.responses import Response,JSONResponse
-from .dashboard import DashboardEngine,DASH,ROOT,read
+from .dashboard import DashboardEngine
 
 router=APIRouter(prefix='/api/dashboard',tags=['Historical dashboard'])
 INIT_LOCK=RLock();INSTANCE=None
-Year=Literal[2023,2024]
 Kind=Literal['Race','Qualifying','Sprint']
 
-def local_dashboard():
+def get_dashboard():
     global INSTANCE
     with INIT_LOCK:
         if INSTANCE is None:
-            if not (DASH/'manifest.json').exists():raise HTTPException(503,'The public archive is still being prepared')
-            INSTANCE=DashboardEngine()
+            from .hopsdata import archive
+            from .appdb import store
+            INSTANCE=DashboardEngine(archive(),store())
         return INSTANCE
-
-def get_dashboard():
-    from .connections import runtime
-    return runtime().engine()
-
-@router.get('/timing')
-def timing(season:int=Query(2024,ge=2023,le=2024),round:int=Query(15,ge=1,le=24)):
-    # Native event laps have no absolute lap endpoints. Keep this replay honestly separate.
-    try:d=local_dashboard().race_view(season,round)
-    except ValueError as e:raise HTTPException(422,str(e))
-    return {**d,'data_source':'public-timing-reference','source_note':'Historical timing always uses the bundled OpenF1/Jolpica replay, not the native Hopsworks lap feature group.'}
 
 def call(method,*args):
     try:return getattr(get_dashboard(),method)(*args)
     except ValueError as e:raise HTTPException(422,str(e))
+
+@router.get('/timing')
+def timing(season:int=Query(2024,ge=2023,le=2024),round:int=Query(15,ge=1,le=24)):
+    return call('race_view',season,round)
 
 @router.get('/catalog')
 def catalog():return get_dashboard().catalog_view()
@@ -89,9 +81,12 @@ def local_source_rows(db,kind,season,round,session):
         fields=['session_time_s','air_temperature','track_temperature','humidity','pressure','wind_speed','wind_direction','rainfall']
         return [{**base,**{k:r.get(k) for k in fields},'rainfall':None if r.get('rainfall') is None else bool(r['rainfall'])} for r in db.weather_view(season,round,session)['rows']]
     rows=[]
-    if season==2024 and round==15 and session=='Race':
-        ghosts=read(ROOT/'data/ghosts.json');laps=db.race_raw(season,round)['laps']
-        for code,g in ghosts.items():
+    if session=='Race':
+        from .engine import lab
+        try:engine=lab(season,round)
+        except ValueError:return rows
+        laps=db.race_raw(season,round)['laps']
+        for code,g in engine.ghosts.items():
             lap=next((l for l in laps if l['driver_code']==code and l['lap_number']==g['lap_number']),None)
             if lap is None or lap['lap_start_s'] is None:continue
             tr=g['trace']
@@ -103,15 +98,13 @@ def local_source_rows(db,kind,season,round,session):
 
 @router.get('/schema/{index}.json')
 def schema_export(index:Literal['f1-sessions','f1-results','f1-laps','f1-weather','f1-telemetry'],season:int=Query(2024,ge=2023,le=2024),round:int=Query(15,ge=1,le=24),session:Literal['Race','Qualifying']='Race'):
-    from .connections import runtime
-    if runtime().modes['data']=='hopsworks':return runtime().native_schema(index,season,round,session)
     try:rows=local_source_rows(get_dashboard(),index.removeprefix('f1-'),season,round,session)
     except ValueError as e:raise HTTPException(422,str(e))
-    payload={'index':index,'records':rows,'record_count':len(rows),'provenance':'Public OpenF1/Jolpica equivalents; not the Hopsworks event tables and not native FastF1 records.',
-        'notes':['Unknown fields stay null. Sector/lap durations are milliseconds. Relative time uses the OpenF1 session start date.',
-            'Race lap position is an as-of join. Native FastF1 track_status is unavailable.',
-            'Qualifying lap samples are not loaded; qualifying results/weather are available.',
-            'Telemetry export is limited to four interpolated 2024 Dutch GP laps, not the full event telemetry corpus.']}
+    payload={'index':index,'records':rows,'record_count':len(rows),'provenance':'Hopsworks F1 feature groups read through the Hopsworks Query Service.',
+        'notes':['Unknown fields stay null. Sector/lap durations are milliseconds. Relative time uses the session start date.',
+            'Race lap position is an as-of join of f1_track_positions at each lap end.',
+            'Qualifying lap samples are not exported; qualifying results/weather are available.',
+            'Telemetry export is the lab ghost laps for this race (fastest green-flag lap per lab driver), interpolated to 361 samples, not the full f1_car_telemetry table.']}
     return JSONResponse(payload,headers={'Content-Disposition':f'attachment; filename="{index}-{season}-r{round}-{session.lower()}.json"'})
 
 def round_float(value):return float(f'{value:.6f}')

@@ -33,7 +33,7 @@ export default function TelemetryScene({a,b,motionA,motionB,playing,rate,cameraM
       sun.shadow.camera.near=50;sun.shadow.camera.far=1000;sun.shadow.normalBias=.035;sun.shadow.bias=-.00008;
       scene.add(sun,sun.target);
       const world=makeWorld(a,b),circuit=buildCircuit(world);scene.add(circuit);
-      const cars=[buildCar(a.driver,COLORS[0],a.compound,a.driver==='NOR'?'4':a.driver==='VER'?'1':a.driver==='LEC'?'16':'81'),buildCar(b.driver,COLORS[1],b.compound,b.driver==='NOR'?'4':b.driver==='VER'?'1':b.driver==='LEC'?'16':'81')];
+      const cars=[buildCar(a.driver,COLORS[0],a.compound,a.number||''),buildCar(b.driver,COLORS[1],b.compound,b.number||'')];
       cars.forEach(c=>scene.add(c.group));
       controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.09;
       controls.minDistance=9;controls.maxDistance=2200;controls.maxPolarAngle=Math.PI*.485;
@@ -121,11 +121,11 @@ export default function TelemetryScene({a,b,motionA,motionB,playing,rate,cameraM
   },[a.driver,a.lap_number,b.driver,b.lap_number]);
 
   return <div className="telemetry-scene" ref={hostRef}>
-    <canvas ref={canvasRef} className="replay-3d-canvas" aria-label={`3D telemetry replay of ${a.driver} and ${b.driver} at Zandvoort`} data-testid="replay-3d-canvas"/>
+    <canvas ref={canvasRef} className="replay-3d-canvas" aria-label={`3D telemetry replay of ${a.driver} and ${b.driver}`} data-testid="replay-3d-canvas"/>
     {!ready&&!error&&<div className="scene-loading"><LoaderCircle size={23} className="spin"/><span>Building your trackside view…</span><small>Local 3D models · no external assets</small></div>}
     {error&&<div className="scene-error"><AlertTriangle size={25}/><h3>3D is unavailable in this browser</h3><p>{error}</p><button className="btn primary" onClick={onFallback}>Continue in 2D</button></div>}
     {ready&&!error&&<>
-      <div className="scene-location"><span className="scene-live-dot"/> ZANDVOORT<span>2024 · HISTORICAL REPLAY</span></div>
+      <div className="scene-location"><span className="scene-live-dot"/> RECORDED LAPS<span>HISTORICAL REPLAY</span></div>
       <div className="scene-view-label"><Move3D size={13}/>{cameraMode==='orbit'?'CIRCUIT / ORBIT':`CHASE · GHOST ${cameraMode==='follow-b'?'B':'A'}`}<span>{cameraMode==='follow-b'?b.driver:a.driver}</span></div>
       {cameraMode==='orbit'&&<div className="orbit-instructions"><MousePointer2 size={12}/>Drag to orbit · scroll / pinch to zoom</div>}
       <div className="scene-credit">REAL XY TELEMETRY<span>Illustrative road, cars & scenery</span></div>

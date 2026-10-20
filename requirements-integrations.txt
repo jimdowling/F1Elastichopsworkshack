@@ -1,2 +1,0 @@
-# Match the SDK major/minor to your Hopsworks deployment if required.
-hopsworks[python]>=4.8,<6

@@ -1,10 +1,10 @@
-# Tested runtime / development versions. Python 3.11+ recommended.
-fastapi==0.146.0
-uvicorn==0.54.0
-pandas==2.2.3
-numpy==2.3.5
-scikit-learn==1.6.1
-requests==2.33.0
-pytest==9.0.3
-httpx==0.28.1
-python-dotenv>=1.0,<2
+# Local development inside a Hopsworks terminal. The deployed app uses the pitlane-app-env
+# environment (python-agent-pipeline + app-requirements.txt).
+hopsworks[python]>=4.8,<6
+fastapi
+uvicorn
+pandas>=2.2
+numpy>=2
+scikit-learn>=1.6
+pytest
+httpx

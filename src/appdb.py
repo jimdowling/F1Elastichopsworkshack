@@ -1,0 +1,170 @@
+"""App-owned tables in the project's RonDB database (the online feature store), replacing SQLite.
+
+Hopsworks injects MYSQL_HOST/PORT/DB/USER and MYSQL_PASSWORD_SECRET_NAME into the app pod
+(db_access, the default). The password is read from the Hopsworks secrets store. Tables are
+prefixed app_pitlane_ so they never collide with feature-group tables (<fg>_<version>), and
+they need the app to be started by a Data Owner (a Data Scientist start is read-only).
+
+Outside a Hopsworks pod (no MYSQL_HOST) the same interface is kept in process memory.
+
+Tables
+  app_pitlane_race_pace     per-driver race-pace features computed by the dashboard
+  app_pitlane_lab_features  the experiment feature tables (pace/dna/strategy/ghost/...) per race
+  app_pitlane_cache         compressed derived payloads (lab telemetry inputs, replay series)
+"""
+from threading import RLock
+import io, json, logging, os, zlib
+
+import pandas as pd
+
+log = logging.getLogger('pitlane.appdb')
+DDL = [
+    """CREATE TABLE IF NOT EXISTS app_pitlane_race_pace (
+         id VARCHAR(160) NOT NULL, season INT NOT NULL, round_number INT NOT NULL, payload TEXT NOT NULL,
+         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         PRIMARY KEY (id), KEY idx_race (season, round_number)
+       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS app_pitlane_lab_features (
+         race_key VARCHAR(16) NOT NULL, name VARCHAR(64) NOT NULL, row_count INT NOT NULL, payload LONGBLOB NOT NULL,
+         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         PRIMARY KEY (race_key, name)
+       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS app_pitlane_cache (
+         cache_key VARCHAR(190) NOT NULL, payload LONGBLOB NOT NULL,
+         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         PRIMARY KEY (cache_key)
+       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
+]
+
+
+def pack(value): return zlib.compress(json.dumps(value, separators=(',', ':'), allow_nan=False).encode(), 6)
+def unpack(blob): return json.loads(zlib.decompress(blob))
+
+
+class MemoryBackend:
+    name = 'process memory (no MYSQL_HOST; local development)'
+
+    def __init__(self): self.tables = {'app_pitlane_race_pace': {}, 'app_pitlane_lab_features': {}, 'app_pitlane_cache': {}}
+    def put_pace(self, season, round_number, rows):
+        for r in rows: self.tables['app_pitlane_race_pace'][r['id']] = (season, round_number, json.dumps(r, separators=(',', ':')))
+    def get_pace(self, season, round_number):
+        return [json.loads(p) for s, r, p in self.tables['app_pitlane_race_pace'].values() if s == season and r == round_number]
+    def count_pace(self): return len(self.tables['app_pitlane_race_pace'])
+    def put_frame(self, race_key, name, blob, rows): self.tables['app_pitlane_lab_features'][(race_key, name)] = (rows, blob)
+    def get_frame(self, race_key, name):
+        v = self.tables['app_pitlane_lab_features'].get((race_key, name)); return None if v is None else v[1]
+    def frame_counts(self, race_key): return {n: rows for (k, n), (rows, _) in self.tables['app_pitlane_lab_features'].items() if k == race_key}
+    def get_cache(self, key): return self.tables['app_pitlane_cache'].get(key)
+    def put_cache(self, key, blob): self.tables['app_pitlane_cache'][key] = blob
+
+
+class RonDBBackend:
+    def __init__(self):
+        import pymysql, hopsworks
+        password = os.environ.get('MYSQL_PASSWORD')
+        if password is None:
+            hopsworks.login(engine='python')
+            password = hopsworks.get_secrets_api().get(os.environ['MYSQL_PASSWORD_SECRET_NAME'])
+        self.settings = dict(host=os.environ['MYSQL_HOST'], port=int(os.environ.get('MYSQL_PORT', '3306')), user=os.environ['MYSQL_USER'],
+                             password=password, database=os.environ['MYSQL_DB'], autocommit=True, charset='utf8mb4')
+        self.pymysql = pymysql; self.conn = None; self.lock = RLock()
+        self.name = f"RonDB {os.environ['MYSQL_DB']} (app_pitlane_* tables)"
+        with self.cursor() as cur:
+            for ddl in DDL: cur.execute(ddl)
+
+    def cursor(self):
+        with self.lock:
+            if self.conn is None: self.conn = self.pymysql.connect(**self.settings)
+            else: self.conn.ping(reconnect=True)
+            return self.conn.cursor()
+
+    def run(self, sql, args=None, fetch=False, many=False):
+        with self.lock, self.cursor() as cur:
+            (cur.executemany if many else cur.execute)(sql, args)
+            return cur.fetchall() if fetch else None
+
+    def put_pace(self, season, round_number, rows):
+        if rows: self.run('INSERT INTO app_pitlane_race_pace (id, season, round_number, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)',
+                          [(r['id'], season, round_number, json.dumps(r, separators=(',', ':'))) for r in rows], many=True)
+    def get_pace(self, season, round_number):
+        return [json.loads(p) for (p,) in self.run('SELECT payload FROM app_pitlane_race_pace WHERE season=%s AND round_number=%s', (season, round_number), fetch=True)]
+    def count_pace(self): return self.run('SELECT COUNT(*) FROM app_pitlane_race_pace', fetch=True)[0][0]
+    def put_frame(self, race_key, name, blob, rows):
+        self.run('INSERT INTO app_pitlane_lab_features (race_key, name, row_count, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE row_count=VALUES(row_count), payload=VALUES(payload)',
+                 (race_key, name, rows, blob))
+    def get_frame(self, race_key, name):
+        r = self.run('SELECT payload FROM app_pitlane_lab_features WHERE race_key=%s AND name=%s', (race_key, name), fetch=True); return r[0][0] if r else None
+    def frame_counts(self, race_key):
+        return dict(self.run('SELECT name, row_count FROM app_pitlane_lab_features WHERE race_key=%s', (race_key,), fetch=True))
+    def get_cache(self, key):
+        r = self.run('SELECT payload FROM app_pitlane_cache WHERE cache_key=%s', (key,), fetch=True); return r[0][0] if r else None
+    def put_cache(self, key, blob):
+        self.run('INSERT INTO app_pitlane_cache (cache_key, payload) VALUES (%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)', (key, blob))
+
+
+class AppStore:
+    """Pace features, per-race lab feature tables, and a derived-payload cache."""
+    CACHE_VERSION = 'v2'
+
+    def __init__(self, backend=None):
+        if backend is None:
+            if 'MYSQL_HOST' in os.environ:
+                try: backend = RonDBBackend()
+                except Exception as e:
+                    log.error('RonDB unavailable (%s); app tables fall back to process memory. Start the app as a Data Owner for write access.', e)
+                    backend = MemoryBackend(); backend.name = f'process memory (RonDB unavailable: {type(e).__name__})'
+            else: backend = MemoryBackend()
+        self.backend = backend; self.lock = RLock()
+
+    @property
+    def name(self): return self.backend.name
+
+    def put_pace(self, season, round_number, rows):
+        with self.lock: self.backend.put_pace(season, round_number, rows); return self.backend.get_pace(season, round_number)
+    def pace_count(self):
+        with self.lock: return self.backend.count_pace()
+
+    def put_read(self, race_key, name, frame):
+        """Persist a feature table and read it back (the round trip the experiments consume)."""
+        if not name.replace('_', '').isalnum(): raise ValueError('Invalid table name')
+        if 'id' in frame and not frame.id.is_unique: raise ValueError('Feature primary keys must be unique')
+        buf = io.BytesIO(); frame.to_parquet(buf, index=False)
+        with self.lock:
+            self.backend.put_frame(race_key, name, buf.getvalue(), len(frame))
+            blob = self.backend.get_frame(race_key, name)
+        read = pd.read_parquet(io.BytesIO(blob))
+        if 'id' in read: read = read.sort_values('id').reset_index(drop=True)
+        if len(read) != len(frame): raise RuntimeError('Feature-table round-trip row count mismatch')
+        if 'id' in frame: read = read.set_index('id').loc[frame['id']].reset_index()
+        return read
+
+    def read(self, race_key, name):
+        with self.lock: blob = self.backend.get_frame(race_key, name)
+        if blob is None: raise ValueError('Unknown table')
+        return pd.read_parquet(io.BytesIO(blob))
+
+    def counts(self, race_key):
+        with self.lock: return self.backend.frame_counts(race_key)
+
+    def cached(self, key, build):
+        """JSON payload from app_pitlane_cache, computing and storing it on a miss."""
+        key = f'{self.CACHE_VERSION}:{key}'
+        with self.lock: blob = self.backend.get_cache(key)
+        if blob is not None:
+            try: return unpack(blob)
+            except Exception: log.warning('Discarding unreadable cache entry %s', key)
+        value = build()
+        try:
+            with self.lock: self.backend.put_cache(key, pack(value))
+        except Exception as e: log.warning('Could not cache %s: %s', key, e)
+        return value
+
+
+STORE = None; LOCK = RLock()
+
+
+def store():
+    global STORE
+    with LOCK:
+        if STORE is None: STORE = AppStore()
+        return STORE

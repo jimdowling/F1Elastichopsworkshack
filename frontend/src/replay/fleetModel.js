@@ -1,5 +1,4 @@
 // Pure multi-car replay logic. No invented race motion, race gaps or missing samples.
-export const GHOST_CODES=['NOR','VER','LEC','PIA'];
 export const MAX_INTERPOLATION_GAP=2.5;
 export const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const finite=Number.isFinite;

@@ -135,7 +135,7 @@ function addScenery(group,world) {
 }
 
 export function buildCircuit(world,options={}) {
-  const group=new THREE.Group();group.name='Illustrative Zandvoort environment';
+  const group=new THREE.Group();group.name='Illustrative track environment';
   group.add(terrain(world,!!options.flat));
   const asphalt=material('#585d60',{map:grainTexture(),roughness:.97,side:THREE.DoubleSide});
   const verge=material('#7a8a5c',{side:THREE.DoubleSide,roughness:1});
