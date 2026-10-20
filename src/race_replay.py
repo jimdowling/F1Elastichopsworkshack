@@ -3,7 +3,7 @@
 One Query Service read per table for the race session (all drivers), then one actual
 location record per 0.5 s bin and one car record per 1 s bin per driver. No invented
 samples; interpolation and gap handling are a disclosed browser visualization step.
-The compact per-driver series are cached in RonDB (app_pitlane_cache).
+The compact per-driver series are cached in RonDB (app_pitlane__cache).
 """
 from datetime import datetime, timezone
 from threading import RLock

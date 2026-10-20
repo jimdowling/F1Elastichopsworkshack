@@ -2,7 +2,7 @@
 
 Inputs (laps, results, telemetry signatures, ghost-lap traces) are built from the shared
 feature groups through the Hopsworks Query Service and cached in RonDB; every feature table
-the models consume is written to RonDB (app_pitlane_lab_features) and read back first.
+the models consume is written to RonDB (app_pitlane__lab_features) and read back first.
 """
 from datetime import datetime, timezone
 from threading import RLock
@@ -18,7 +18,8 @@ from xgboost import XGBRegressor, XGBClassifier
 import threading
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matrix
-from .hopsdata import records, FEATURE_STORE
+from . import hopsdata
+from .hopsdata import records
 from .registry import models as model_store
 from . import model_plots
 
@@ -146,14 +147,14 @@ def build_lab_inputs(arch,data,season,rnd):
     w=raw['weather'];air=[x['air_temperature'] for x in w if x.get('air_temperature') is not None];track=[x['track_temperature'] for x in w if x.get('track_temperature') is not None]
     manifest=dict(dataset=f"{season} {event['event_name']} · Race",circuit=event.get('location') or event.get('circuit_name'),circuit_name=event.get('circuit_name'),country=event.get('country'),
      date=event['date'],season=season,round=rnd,total_laps=int(max(x['lap_number'] for x in rows)),lap_rows=len(rows),drivers=len(results),dna_laps=sum(x['driver'] in selected for x in dna),
-     ghost_laps=len(selected),selected_drivers=selected,fetched_at=now(),source=f'Hopsworks feature groups in {FEATURE_STORE} via the Hopsworks Query Service',synthetic_observations=0,
+     ghost_laps=len(selected),selected_drivers=selected,fetched_at=now(),source=f'Hopsworks feature groups in {hopsdata.FEATURE_STORE} via the Hopsworks Query Service',synthetic_observations=0,
      weather={'air_temp_c':float(np.median(air)) if air else None,'track_temp_c':float(np.median(track)) if track else None,'rain_samples':int(sum(bool(x.get('rainfall')) for x in w)),'samples':len(w)},
      feature_groups=['f1_laps','f1_stints','f1_race_control','f1_race_results','f1_session_drivers','f1_car_telemetry','f1_car_location'],
      notes=['All observations come from the shared Hopsworks F1 feature groups. Zero synthetic race observations.',
       'Tyre age and pit-in flags are derived from stint/pit records. Track eligibility is conservatively derived from race-control flags. Sector-sum consistency is the lap-accuracy check.',
       'Distance is approximated by integrating measured speed. Telemetry and positions are interpolated for visualization.',
       'Pitwall outcomes are illustrative model outputs, not observed alternatives or validated causal predictions.',
-      'Feature tables are written to and read back from RonDB (app_pitlane_lab_features) before the models consume them.',
+      'Feature tables are written to and read back from RonDB (app_pitlane__lab_features) before the models consume them.',
       'Different fastest laps have different tyre/fuel/traffic conditions. Driver DNA identifies same-race driver-car signatures, not intrinsic driving style.'])
     return safe(dict(manifest=manifest,results=results,laps=rows,ghosts={c:ghosts[c] for c in selected},dna=[x for x in dna if x['driver'] in selected],classified_times=classified,selected=selected))
 
@@ -407,7 +408,7 @@ class LabEngine:
 
     def pipeline_status(self):
         return safe(dict(status='ready',built_at=self.built_at,duration_seconds=getattr(self,'duration',0),steps=self.steps,
-          search_backend=f'Hopsworks Query Service · {FEATURE_STORE}',feature_backend=self.store.name,cloud_connected=True,race_key=self.race_key,models=self.model_sources,
+          search_backend=f'Hopsworks Query Service · {hopsdata.FEATURE_STORE}',feature_backend=self.store.name,cloud_connected=True,race_key=self.race_key,models=self.model_sources,
           groups=[{'name':n,'rows':int(c),'version':1,'primary_key':'id','read_back':True} for n,c in sorted(self.store.counts(self.race_key).items()) if n!='race_laps']))
 
     def bootstrap(self):

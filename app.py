@@ -1,9 +1,9 @@
 """PITLANE: F1 2023–2024 dashboard and idea lab on Hopsworks (FastAPI JSON API under /api + prebuilt React UI from web/).
 
-Data: the shared F1 feature groups (F1_FEATURE_STORE, default hopsworks_default_featurestore), read with
+Data: the F1 feature groups (F1_FEATURE_STORE, else the project's own store, else hopsworks_default_featurestore), read with
 the Hopsworks Python client (fg.select(...).filter(...).read()), which is served by the Hopsworks Query
 Service. App state (pace features, per-race lab feature tables, derived replay/telemetry payloads) lives
-in RonDB tables app_pitlane_* in the project database. No bundled data and no SQLite.
+in RonDB tables app_pitlane__* (registered with app.register_table) in the project database. No bundled data and no SQLite.
 
 Runs as a Hopsworks custom app: binds 0.0.0.0:$APP_PORT, serves /health for the readiness probe, and every
 UI URL is relative so it works under the proxy mount /hopsworks-api/pythonapp/<project>/<app>/.

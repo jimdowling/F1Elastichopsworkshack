@@ -4,8 +4,9 @@ Every read is `fg.select(...).filter(...).read()` on the python engine, so it is
 served by the Hopsworks Feature Query Service (Arrow Flight, "Flyingduck") with
 the filter pushed down; nothing goes through Trino and nothing is bundled.
 
-The feature groups live in the feature store shared with this project
-(F1_FEATURE_STORE, default hopsworks_default_featurestore). Jolpica-derived
+The feature groups are read from F1_FEATURE_STORE when it is set; otherwise from
+the project's own feature store when it holds them, else from the store shared
+with the project, hopsworks_default_featurestore. Jolpica-derived
 groups (f1_races, f1_race_results, ...) are keyed by season/round; OpenF1-derived
 groups (f1_laps, f1_car_telemetry, ...) by session_key.
 """
@@ -19,7 +20,9 @@ import numpy as np
 import pandas as pd
 
 log = logging.getLogger('pitlane.hopsdata')
-FEATURE_STORE = os.environ.get('F1_FEATURE_STORE', 'hopsworks_default_featurestore')
+SHARED_FEATURE_STORE = 'hopsworks_default_featurestore'
+# Resolved by HopsData.store() on first use; this is the name until then.
+FEATURE_STORE = os.environ.get('F1_FEATURE_STORE', SHARED_FEATURE_STORE)
 VERSION = int(os.environ.get('F1_FEATURE_VERSION', '1'))
 SEASONS = [2023, 2024]
 INT_FIELDS = {'position', 'grid', 'laps', 'car_number', 'fastest_lap_number', 'fastest_lap_rank', 'stint_number', 'lap_start', 'lap_end',
@@ -81,8 +84,19 @@ class HopsData:
 
     def store(self):
         with self.lock:
-            if self.fs is None: self.fs = self.project().get_feature_store(FEATURE_STORE)
+            if self.fs is None: self.fs = self._resolve_store()
             return self.fs
+
+    def _resolve_store(self):
+        global FEATURE_STORE
+        project = self.project()
+        if 'F1_FEATURE_STORE' in os.environ: fs = project.get_feature_store(os.environ['F1_FEATURE_STORE'])
+        else:
+            fs = project.get_feature_store()
+            if fs.get_feature_group('f1_races', version=VERSION) is None: fs = project.get_feature_store(SHARED_FEATURE_STORE)
+        FEATURE_STORE = fs.name
+        log.info('Reading F1 feature groups from %s', FEATURE_STORE)
+        return fs
 
     def group(self, name):
         with self.lock:

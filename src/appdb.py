@@ -1,16 +1,18 @@
 """App-owned tables in the project's RonDB database (the online feature store), replacing SQLite.
 
 Hopsworks injects MYSQL_HOST/PORT/DB/USER and MYSQL_PASSWORD_SECRET_NAME into the app pod
-(db_access, the default). The password is read from the Hopsworks secrets store. Tables are
-prefixed app_pitlane_ so they never collide with feature-group tables (<fg>_<version>), and
-they need the app to be started by a Data Owner (a Data Scientist start is read-only).
+(db_access, the default). The password is read from the Hopsworks secrets store. The app connects
+as its own database user, so every table is registered with app.register_table() before its
+CREATE TABLE; that grants the app the table, prefixes it with app.table_prefix
+(app_<app name>__) and drops it when the app is deleted. Apps created before table registration
+(managed_db False) keep the unprefixed app_pitlane_* names and need a Data Owner start.
 
 Outside a Hopsworks pod (no MYSQL_HOST) the same interface is kept in process memory.
 
-Tables
-  app_pitlane_race_pace     per-driver race-pace features computed by the dashboard
-  app_pitlane_lab_features  the experiment feature tables (pace/dna/strategy/ghost/...) per race
-  app_pitlane_cache         compressed derived payloads (lab telemetry inputs, replay series)
+Tables (logical name -> <prefix><name>)
+  race_pace     per-driver race-pace features computed by the dashboard
+  lab_features  the experiment feature tables (pace/dna/strategy/ghost/...) per race
+  cache         compressed derived payloads (lab telemetry inputs, replay series)
 """
 from threading import RLock
 import io, json, logging, os, zlib
@@ -18,23 +20,45 @@ import io, json, logging, os, zlib
 import pandas as pd
 
 log = logging.getLogger('pitlane.appdb')
-DDL = [
-    """CREATE TABLE IF NOT EXISTS app_pitlane_race_pace (
+TABLES = ('race_pace', 'lab_features', 'cache')
+DDL = {
+    'race_pace': """CREATE TABLE IF NOT EXISTS {race_pace} (
          id VARCHAR(160) NOT NULL, season INT NOT NULL, round_number INT NOT NULL, payload TEXT NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
          PRIMARY KEY (id), KEY idx_race (season, round_number)
        ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
-    """CREATE TABLE IF NOT EXISTS app_pitlane_lab_features (
+    'lab_features': """CREATE TABLE IF NOT EXISTS {lab_features} (
          race_key VARCHAR(16) NOT NULL, name VARCHAR(64) NOT NULL, row_count INT NOT NULL, payload LONGBLOB NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
          PRIMARY KEY (race_key, name)
        ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
-    """CREATE TABLE IF NOT EXISTS app_pitlane_cache (
+    'cache': """CREATE TABLE IF NOT EXISTS {cache} (
          cache_key VARCHAR(190) NOT NULL, payload LONGBLOB NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
          PRIMARY KEY (cache_key)
        ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
-]
+}
+
+
+def table_names():
+    """Register the app's tables and return {logical name: SQL name}.
+
+    The app is looked up by its job name (HOPSWORKS_JOB_NAME, set in the app pod; PITLANE_APP_NAME overrides).
+    register_table is idempotent, so this runs on every start. A hopsworks client older than table
+    registration (no App.register_table) gets the same calls through the REST API it wraps.
+    """
+    import hopsworks
+    from hopsworks_common import client
+    hopsworks.login(engine='python')
+    app_name = os.environ.get('PITLANE_APP_NAME') or os.environ['HOPSWORKS_JOB_NAME']
+    c = client._get_instance(); path = ['project', c._project_id, 'apps', app_name]
+    app = c._send_request('GET', path)
+    if not app.get('managedDb'):
+        log.warning('App %s predates table registration; using unprefixed app_pitlane_* tables (needs a Data Owner start)', app_name)
+        return {t: f'app_pitlane_{t}' for t in TABLES}
+    prefix = app['tablePrefix']
+    return {t: c._send_request('POST', path + ['tables'], headers={'content-type': 'application/json'},
+                               data=json.dumps({'name': prefix + t}))['name'] for t in TABLES}
 
 
 def pack(value): return zlib.compress(json.dumps(value, separators=(',', ':'), allow_nan=False).encode(), 6)
@@ -68,9 +92,10 @@ class RonDBBackend:
         self.settings = dict(host=os.environ['MYSQL_HOST'], port=int(os.environ.get('MYSQL_PORT', '3306')), user=os.environ['MYSQL_USER'],
                              password=password, database=os.environ['MYSQL_DB'], autocommit=True, charset='utf8mb4')
         self.pymysql = pymysql; self.conn = None; self.lock = RLock()
-        self.name = f"RonDB {os.environ['MYSQL_DB']} (app_pitlane_* tables)"
+        self.t = t = table_names()
+        self.name = f"RonDB {os.environ['MYSQL_DB']} ({', '.join(t.values())})"
         with self.cursor() as cur:
-            for ddl in DDL: cur.execute(ddl)
+            for name, ddl in DDL.items(): cur.execute(ddl.format(**{name: t[name]}))
 
     def cursor(self):
         with self.lock:
@@ -84,22 +109,22 @@ class RonDBBackend:
             return cur.fetchall() if fetch else None
 
     def put_pace(self, season, round_number, rows):
-        if rows: self.run('INSERT INTO app_pitlane_race_pace (id, season, round_number, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)',
+        if rows: self.run(f'INSERT INTO {self.t["race_pace"]} (id, season, round_number, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)',
                           [(r['id'], season, round_number, json.dumps(r, separators=(',', ':'))) for r in rows], many=True)
     def get_pace(self, season, round_number):
-        return [json.loads(p) for (p,) in self.run('SELECT payload FROM app_pitlane_race_pace WHERE season=%s AND round_number=%s', (season, round_number), fetch=True)]
-    def count_pace(self): return self.run('SELECT COUNT(*) FROM app_pitlane_race_pace', fetch=True)[0][0]
+        return [json.loads(p) for (p,) in self.run(f'SELECT payload FROM {self.t["race_pace"]} WHERE season=%s AND round_number=%s', (season, round_number), fetch=True)]
+    def count_pace(self): return self.run(f'SELECT COUNT(*) FROM {self.t["race_pace"]}', fetch=True)[0][0]
     def put_frame(self, race_key, name, blob, rows):
-        self.run('INSERT INTO app_pitlane_lab_features (race_key, name, row_count, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE row_count=VALUES(row_count), payload=VALUES(payload)',
+        self.run(f'INSERT INTO {self.t["lab_features"]} (race_key, name, row_count, payload) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE row_count=VALUES(row_count), payload=VALUES(payload)',
                  (race_key, name, rows, blob))
     def get_frame(self, race_key, name):
-        r = self.run('SELECT payload FROM app_pitlane_lab_features WHERE race_key=%s AND name=%s', (race_key, name), fetch=True); return r[0][0] if r else None
+        r = self.run(f'SELECT payload FROM {self.t["lab_features"]} WHERE race_key=%s AND name=%s', (race_key, name), fetch=True); return r[0][0] if r else None
     def frame_counts(self, race_key):
-        return dict(self.run('SELECT name, row_count FROM app_pitlane_lab_features WHERE race_key=%s', (race_key,), fetch=True))
+        return dict(self.run(f'SELECT name, row_count FROM {self.t["lab_features"]} WHERE race_key=%s', (race_key,), fetch=True))
     def get_cache(self, key):
-        r = self.run('SELECT payload FROM app_pitlane_cache WHERE cache_key=%s', (key,), fetch=True); return r[0][0] if r else None
+        r = self.run(f'SELECT payload FROM {self.t["cache"]} WHERE cache_key=%s', (key,), fetch=True); return r[0][0] if r else None
     def put_cache(self, key, blob):
-        self.run('INSERT INTO app_pitlane_cache (cache_key, payload) VALUES (%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)', (key, blob))
+        self.run(f'INSERT INTO {self.t["cache"]} (cache_key, payload) VALUES (%s,%s) ON DUPLICATE KEY UPDATE payload=VALUES(payload)', (key, blob))
 
 
 class AppStore:
@@ -111,7 +136,7 @@ class AppStore:
             if 'MYSQL_HOST' in os.environ:
                 try: backend = RonDBBackend()
                 except Exception as e:
-                    log.error('RonDB unavailable (%s); app tables fall back to process memory. Start the app as a Data Owner for write access.', e)
+                    log.error('RonDB unavailable (%s); app tables fall back to process memory.', e)
                     backend = MemoryBackend(); backend.name = f'process memory (RonDB unavailable: {type(e).__name__})'
             else: backend = MemoryBackend()
         self.backend = backend; self.lock = RLock()
