@@ -6,5 +6,7 @@ uvicorn
 pandas>=2.2
 numpy>=2
 scikit-learn>=1.6
+xgboost
+matplotlib
 pytest
 httpx

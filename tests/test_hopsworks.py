@@ -5,7 +5,7 @@ otherwise process memory. Values below are the published 2023–2024 results, so
 reading or joining the feature groups shows up as a wrong championship, count or lab metric.
 """
 from collections import Counter, defaultdict
-import statistics
+import statistics, tempfile
 import numpy as np
 import pytest
 
@@ -17,10 +17,13 @@ from src.engine import lab as get_lab, make_pace_features, DNA_FEATURES
 
 class MemoryModels:
     """Stand-in Model Registry so test runs don't upload model versions."""
-    def __init__(self): self.saved = {}
+    def __init__(self): self.saved = {}; self.charts = {}
     def load(self, name, digest):
         v = self.saved.get(name); return (v[0], len(self.saved)) if v and v[1] == digest else None
-    def save(self, name, obj, digest, metrics, text): self.saved[name] = (obj, digest); return 1
+    def save(self, name, obj, digest, metrics, text, images=None):
+        if images is not None:
+            with tempfile.TemporaryDirectory() as d: self.charts[name] = images(d)
+        self.saved[name] = (obj, digest); return 1
 
 
 import src.engine as engine_module

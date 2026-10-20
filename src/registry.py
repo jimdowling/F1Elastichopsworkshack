@@ -44,9 +44,12 @@ class ModelStore:
                 log.warning('Could not load %s v%s: %s', name, m.version, e)
         return None
 
-    def save(self, name, obj, digest, metrics, description):
-        """Register a new version; returns the version number."""
+    def save(self, name, obj, digest, metrics, description, images=None):
+        """Register a new version; images(folder) writes diagnostic PNGs to <model dir>/images first. Returns the version."""
         with tempfile.TemporaryDirectory() as d:
+            if images is not None:
+                try: log.info('Saved %s charts: %s', name, images(d))
+                except Exception: log.exception('Could not draw charts for %s; registering without them', name)
             joblib.dump(obj, os.path.join(d, 'model.joblib'))
             json.dump({'training_digest': digest, 'runtime': RUNTIME, 'metrics': metrics}, open(os.path.join(d, 'pitlane.json'), 'w'))
             model = self.registry().python.create_model(name=name, metrics={k: float(v) for k, v in metrics.items()}, description=description[:900])

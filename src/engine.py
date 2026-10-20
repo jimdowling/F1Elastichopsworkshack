@@ -20,6 +20,7 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matrix
 from .hopsdata import records, FEATURE_STORE
 from .registry import models as model_store
+from . import model_plots
 
 log=logging.getLogger('pitlane.engine')
 LAB_DRIVERS=4
@@ -233,7 +234,7 @@ class LabEngine:
         def run():
             for kind,name,obj,d,m,text in jobs:
                 try:
-                    version=model_store().save(name,obj,d,m,text)
+                    version=model_store().save(name,obj,d,m,text,images=lambda folder,kind=kind:model_plots.write(kind,folder,self))
                     self.model_sources[kind]={'name':name,'version':version,'source':'trained in the app; registered in the Model Registry'}
                     log.info('Registered %s v%s',name,version)
                 except Exception as e:
@@ -273,7 +274,7 @@ class LabEngine:
         def fit():
             pre=ColumnTransformer([('numeric','passthrough',['lap_number','tyre_life']),('category',OneHotEncoder(handle_unknown='ignore',sparse_output=False),['driver_code','compound'])])
             return Pipeline([('pre',pre),('ridge',Ridge(alpha=5.))]).fit(frame,frame.lap_duration_s)
-        model=self.model('strategy',digest(frame,cols),fit);pre=model.named_steps['pre']
+        model=self.model('strategy',digest(frame,cols),fit);pre=model.named_steps['pre'];self.strategy_frame=frame;self.strategy_model=model
         coefs=dict(zip(pre.get_feature_names_out(),model.named_steps['ridge'].coef_))
         raw_age=float(coefs['numeric__tyre_life']);raw_fuel=float(coefs['numeric__lap_number'])
         self.age_coefficient=float(np.clip(raw_age,.002,.16));self.fuel_coefficient=float(np.clip(raw_fuel,-.12,.03))
