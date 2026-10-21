@@ -2,10 +2,11 @@
 
 Hopsworks injects MYSQL_HOST/PORT/DB/USER and MYSQL_PASSWORD_SECRET_NAME into the app pod
 (db_access, the default). The password is read from the Hopsworks secrets store. The app connects
-as its own database user, so every table is registered with app.register_table() before its
-CREATE TABLE; that grants the app the table, prefixes it with app.table_prefix
-(app_<app name>__) and drops it when the app is deleted. Apps created before table registration
-(managed_db False) keep the unprefixed app_pitlane_* names and need a Data Owner start.
+as its own database user, which cannot create or alter tables, so each table is created with
+app.create_table(): Hopsworks runs the CREATE TABLE on disk in RonDB, grants the app the table,
+prefixes it with app.table_prefix (app_<app name>__) and drops it when the app is deleted. Apps
+created before table registration (managed_db False) keep the unprefixed app_pitlane_* names,
+create them themselves and need a Data Owner start.
 
 Outside a Hopsworks pod (no MYSQL_HOST) the same interface is kept in process memory. Inside one, a
 failure to reach RonDB fails the start instead: state silently kept in memory is lost on restart.
@@ -22,42 +23,37 @@ import pandas as pd
 
 log = logging.getLogger('pitlane.appdb')
 TABLES = ('race_pace', 'lab_features', 'cache')
-DDL = {
-    'race_pace': """CREATE TABLE IF NOT EXISTS {race_pace} (
-         id VARCHAR(160) NOT NULL, season INT NOT NULL, round_number INT NOT NULL, payload TEXT NOT NULL,
+# Columns and indexes of each table, what goes inside CREATE TABLE's parentheses.
+DEFINITIONS = {
+    'race_pace': """id VARCHAR(160) NOT NULL, season INT NOT NULL, round_number INT NOT NULL, payload TEXT NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         PRIMARY KEY (id), KEY idx_race (season, round_number)
-       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
-    'lab_features': """CREATE TABLE IF NOT EXISTS {lab_features} (
-         race_key VARCHAR(16) NOT NULL, name VARCHAR(64) NOT NULL, row_count INT NOT NULL, payload LONGBLOB NOT NULL,
+         PRIMARY KEY (id), KEY idx_race (season, round_number)""",
+    'lab_features': """race_key VARCHAR(16) NOT NULL, name VARCHAR(64) NOT NULL, row_count INT NOT NULL, payload LONGBLOB NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         PRIMARY KEY (race_key, name)
-       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
-    'cache': """CREATE TABLE IF NOT EXISTS {cache} (
-         cache_key VARCHAR(190) NOT NULL, payload LONGBLOB NOT NULL,
+         PRIMARY KEY (race_key, name)""",
+    'cache': """cache_key VARCHAR(190) NOT NULL, payload LONGBLOB NOT NULL,
          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         PRIMARY KEY (cache_key)
-       ) ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4""",
+         PRIMARY KEY (cache_key)""",
 }
 
 
 def table_names():
-    """Register the app's tables and return {logical name: SQL name}.
+    """Create the app's tables and return ({logical name: SQL name}, whether Hopsworks created them).
 
     The app is looked up by its job name (HOPSWORKS_JOB_NAME, set in the app pod; PITLANE_APP_NAME overrides).
-    register_table is idempotent, so this runs on every start.
+    create_table is idempotent, so this runs on every start.
     """
     import hopsworks
     project = hopsworks.login(engine='python')
     app_name = os.environ.get('PITLANE_APP_NAME') or os.environ['HOPSWORKS_JOB_NAME']
     app = project.get_app_api().get_app(app_name)
-    if not hasattr(app, 'register_table'):
-        raise RuntimeError('The hopsworks client in this environment predates App.register_table; '
-                           'install a client with app table registration in the app environment')
     if not app.managed_db:
         log.warning('App %s predates table registration; using unprefixed app_pitlane_* tables (needs a Data Owner start)', app_name)
-        return {t: f'app_pitlane_{t}' for t in TABLES}
-    return {t: app.register_table(t) for t in TABLES}
+        return {t: f'app_pitlane_{t}' for t in TABLES}, False
+    if not hasattr(app, 'create_table'):
+        raise RuntimeError('The hopsworks client in this environment predates App.create_table; '
+                           'install a client where Hopsworks creates app tables in the app environment')
+    return {t: app.create_table(t, DEFINITIONS[t]) for t in TABLES}, True
 
 
 def pack(value): return zlib.compress(json.dumps(value, separators=(',', ':'), allow_nan=False).encode(), 6)
@@ -91,10 +87,13 @@ class RonDBBackend:
         self.settings = dict(host=os.environ['MYSQL_HOST'], port=int(os.environ.get('MYSQL_PORT', '3306')), user=os.environ['MYSQL_USER'],
                              password=password, database=os.environ['MYSQL_DB'], autocommit=True, charset='utf8mb4')
         self.pymysql = pymysql; self.conn = None; self.lock = RLock()
-        self.t = t = table_names()
-        self.name = f"RonDB {os.environ['MYSQL_DB']} ({', '.join(t.values())})"
-        with self.cursor() as cur:
-            for name, ddl in DDL.items(): cur.execute(ddl.format(**{name: t[name]}))
+        self.t, created = table_names()
+        self.name = f"RonDB {os.environ['MYSQL_DB']} ({', '.join(self.t.values())})"
+        if not created:
+            with self.cursor() as cur:
+                for name, definition in DEFINITIONS.items():
+                    cur.execute(f"CREATE TABLE IF NOT EXISTS {self.t[name]} ({definition}) "
+                                "ENGINE=NDBCLUSTER DEFAULT CHARSET=utf8mb4")
 
     def cursor(self):
         with self.lock:
